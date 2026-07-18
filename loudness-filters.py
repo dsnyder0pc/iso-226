@@ -83,14 +83,35 @@ def calculate_filters_for_level(target_level):
     return scaled_filters
 
 
-def write_markdown_table(filters, level):
+def calculate_headroom_offset(filters, fs=48000):
+    """Calculates the headroom offset (negative gain) required to keep the response below 0 dB."""
+    if not filters:
+        return 0.0
+    frequencies = np.logspace(np.log10(20), np.log10(20000), 1000)
+    w_eval = 2 * np.pi * frequencies / fs
+    total_h = np.ones(len(frequencies), dtype=complex)
+    for filt in filters:
+        b, a = get_biquad_coefs(filt[0], filt[1], fs, filt[2], filt[3])
+        total_h *= freqz(b, a, worN=w_eval)[1]
+    response_db = 20 * np.log10(np.abs(total_h))
+    max_gain = np.max(response_db)
+    if max_gain > 0.0:
+        return -round(max_gain, 2)
+    return 0.0
+
+
+def write_markdown_table(filters, level, headroom_offset=0.0):
     """Writes a markdown table listing the PEQ filters to a file and prints it."""
     level_str = f"{int(level)}" if level.is_integer() else f"{level}"
     filename = f"filter-{level_str}db.md"
 
     lines = []
     lines.append(f"### Equal-Loudness Compensation EQ for {level} dB")
-    lines.append(f"*(Reference Level: {REF_LEVEL} dB)*\n")
+    if headroom_offset != 0.0:
+        lines.append(f"*(Reference Level: {REF_LEVEL} dB, Headroom Adjustment: {headroom_offset:.2f} dB)*\n")
+    else:
+        lines.append(f"*(Reference Level: {REF_LEVEL} dB)*\n")
+
     if not filters:
         lines.append("No correction filters are needed for this playback level.\n")
     else:
@@ -108,7 +129,7 @@ def write_markdown_table(filters, level):
     print(f"Saved PEQ table to: {filename}")
 
 
-def plot_frequency_response(filters, level, fs=48000):
+def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000):
     """Plots the combined frequency response of the PEQ filters and saves to PNG."""
     frequencies = np.logspace(np.log10(20), np.log10(20000), 1000)
     w_eval = 2 * np.pi * frequencies / fs
@@ -120,26 +141,38 @@ def plot_frequency_response(filters, level, fs=48000):
         b, a = get_biquad_coefs(filt[0], filt[1], fs, filt[2], filt[3])
         total_h *= freqz(b, a, worN=w_eval)[1]
 
-    # Convert magnitude to dB
-    response_db = 20 * np.log10(np.abs(total_h))
+    # Convert magnitude to dB and apply headroom offset
+    response_db = 20 * np.log10(np.abs(total_h)) + headroom_offset
 
     # Plot setup
     plt.figure(figsize=(12, 6))
-    plt.semilogx(frequencies, response_db, color='#1f77b4', linewidth=2)
-    plt.title(f'Equal-Loudness PEQ Compensation ({level} dB Average Playback)')
+    plt.semilogx(frequencies, response_db, color='#1f77b4', linewidth=2, label='Compensated Response')
+
+    title_str = f'Equal-Loudness PEQ Compensation ({level} dB Average Playback)'
+    if headroom_offset != 0.0:
+        title_str += f'\n(Headroom Adjustment: {headroom_offset:.2f} dB)'
+    plt.title(title_str)
+
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Amplitude (dB)')
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.xlim([20, 20000])
 
-    # Set y-axis limits to accommodate scaling well
+    # Set y-axis limits to accommodate scaling and 0 dB ceiling
     plt.ylim([
-        min(np.min(response_db) - 1, -2),
-        max(np.max(response_db) + 2, 6)
+        min(np.min(response_db) - 1, -6),
+        max(np.max(response_db) + 1, 2)
     ])
 
     # Add reference markers
-    plt.axhline(0, color='black', linewidth=1)
+    plt.axhline(0, color='r', linestyle='--', linewidth=1.2, label='Digital Clipping Limit (0 dB)')
+    if headroom_offset != 0.0:
+        plt.axhline(
+            headroom_offset, color='black', linestyle=':', linewidth=1,
+            label=f'Original Flat Reference ({headroom_offset:.2f} dB)'
+        )
+
+    plt.legend(loc='best')
 
     # Adjust x-axis ticks for standard audio plot visibility
     plt.xticks(
@@ -161,5 +194,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     target_filters = calculate_filters_for_level(args.level)
-    write_markdown_table(target_filters, args.level)
-    plot_frequency_response(target_filters, args.level)
+    offset = calculate_headroom_offset(target_filters)
+    write_markdown_table(target_filters, args.level, offset)
+    plot_frequency_response(target_filters, args.level, offset)

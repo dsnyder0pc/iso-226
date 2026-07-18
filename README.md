@@ -8,7 +8,7 @@ This repository provides a utility to generate Parametric EQ (PEQ) filters that 
 
 The human ear does not perceive all frequencies equally. Crucially, our sensitivity to bass (low frequencies) and treble (high frequencies) drops significantly as the overall volume level decreases. This phenomenon is standardized in **ISO 226**.
 
-To maintain a natural and consistent tonal balance, audio playback systems ideally need dynamic loudness compensation—where EQ curves dynamically adjust based on the current volume level. However, achieving real-time feedback from a volume control or room SPL meter in playback ecosystems like **Roon** is technically challenging. 
+To maintain a natural and consistent tonal balance, audio playback systems ideally need dynamic loudness compensation—where EQ curves dynamically adjust based on the current volume level. However, achieving real-time feedback from a volume control or room SPL meter in playback ecosystems like **Roon** is technically challenging.
 
 This project solves that problem by generating three distinct static PEQ presets for common listening levels:
 
@@ -18,25 +18,33 @@ This project solves that problem by generating three distinct static PEQ presets
 
 This approach offers a practical, high-fidelity alternative to the classic "one-size-fits-all" loudness switches found on vintage receivers (like the Pioneer SX-780 driving Pioneer HPM 100 speakers), which were either on or off and not level-aware.
 
+### Digital Headroom & Clipping Prevention
+Because equal-loudness compensation requires boosts in the low and high frequencies, applying these filters digitally can exceed `0 dB` and cause digital clipping (distortion). To prevent this, there are two primary methods:
+1.  **Midrange Attenuation (Only Cuts)**: Designing filters that only cut the mids (similar to how vintage Yamaha variable loudness circuits behave). While mathematically equivalent, this is complex to configure as PEQ bands.
+2.  **Loudness Boosts + Preamp Attenuation**: Keeping the intuitive boosting filters (low/high shelves) and applying a global preamp reduction (headroom adjustment) equal to the highest peak of the combined filter response. This is the industry-standard method for DSP systems like Roon or miniDSP.
+
+This project implements **Option 2**. The generator calculates the exact peak gain of the combined response and outputs the recommended negative preamp offset to ensure the entire filter curve remains at or below `0 dB`.
+
 ---
 
 ## How It Works
 
 The script [loudness-filters.py](file:///home/dsnyder/src/iso-226/loudness-filters.py) calculates the required EQ corrections based on a baseline EQ profile designed for a 65 dB target level (representing an 18 dB deviation from the 83 dB reference level).
 
-1.  **Scaling**: It scales the baseline gains in [BASE_FILTERS](file:///home/dsnyder/src/iso-226/loudness-filters.py#L22) proportionally based on the target level's distance from the 83 dB reference level.
-2.  **Biquad Calculation**: Using the Robert Bristow-Johnson Audio EQ Cookbook formulas implemented in [get_biquad_coefs](file:///home/dsnyder/src/iso-226/loudness-filters.py#L36), it designs digital filter coefficients for low-shelf, high-shelf, and peak filters.
-3.  **Visualization**: It evaluates the combined frequency response of all active filters using `scipy.signal.freqz` in [plot_frequency_response](file:///home/dsnyder/src/iso-226/loudness-filters.py#L111) and plots it to a PNG file.
-4.  **Tables**: It outputs a formatted Markdown table using [write_markdown_table](file:///home/dsnyder/src/iso-226/loudness-filters.py#L86) for easy copying into playback software (like Roon).
+1.  **Scaling**: Scales the baseline gains in [BASE_FILTERS](file:///home/dsnyder/src/iso-226/loudness-filters.py#L22) proportionally based on the target level's distance from the 83 dB reference level.
+2.  **Biquad Calculation**: Using Robert Bristow-Johnson's Audio EQ Cookbook formulas implemented in [get_biquad_coefs](file:///home/dsnyder/src/iso-226/loudness-filters.py#L36), it designs digital biquad filter coefficients for low-shelf, high-shelf, and peak filters.
+3.  **Headroom Calculation**: Evaluates the combined response and computes the required negative headroom offset in [calculate_headroom_offset](file:///home/dsnyder/src/iso-226/loudness-filters.py#L83) to keep peak gain below 0 dB.
+4.  **Visualization**: Evaluates and plots the combined frequency response (including the headroom adjustment) relative to the 0 dB clipping ceiling in [plot_frequency_response](file:///home/dsnyder/src/iso-226/loudness-filters.py#L122).
+5.  **Tables**: Outputs a formatted Markdown table detailing the PEQ bands and the required headroom adjustment offset using [write_markdown_table](file:///home/dsnyder/src/iso-226/loudness-filters.py#L101).
 
 ---
 
 ## Requirements
 
-Ensure you have Python 3 and the following dependencies installed:
+Ensure you have Python 3 and the dependencies listed in [requirements.txt](file:///home/dsnyder/src/iso-226/requirements.txt) installed:
 
 ```bash
-pip install numpy matplotlib scipy
+pip install -r requirements.txt
 ```
 
 ---
@@ -61,6 +69,9 @@ Below are the pre-generated PEQ tables and frequency responses for the three pri
 ### 1. Low Level (62 dB)
 Designed for quiet, non-intrusive playback. See the generated [filter-62db.md](file:///home/dsnyder/src/iso-226/filter-62db.md) for raw details.
 
+*   **Reference Level**: 83.0 dB
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `-5.61 dB`
+
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | Low Shelf | 35 | 2.92 | 0.71 |
@@ -80,6 +91,9 @@ Designed for quiet, non-intrusive playback. See the generated [filter-62db.md](f
 ### 2. Medium Level (75 dB)
 Designed for casual, extended listening sessions. See the generated [filter-75db.md](file:///home/dsnyder/src/iso-226/filter-75db.md) for raw details.
 
+*   **Reference Level**: 83.0 dB
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `-2.13 dB`
+
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | Low Shelf | 35 | 1.11 | 0.71 |
@@ -97,7 +111,10 @@ Designed for casual, extended listening sessions. See the generated [filter-75db
 ---
 
 ### 3. High Level (87 dB)
-Designed for active demo sessions. Since this is above the 83 dB reference level, it applies slight attenuation. See the generated [filter-87db.md](file:///home/dsnyder/src/iso-226/filter-87db.md) for raw details.
+Designed for active demo sessions. Since this level is above the 83 dB reference, it applies only attenuation (cuts). No headroom adjustment is required. See the generated [filter-87db.md](file:///home/dsnyder/src/iso-226/filter-87db.md) for raw details.
+
+*   **Reference Level**: 83.0 dB
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `0.00 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
