@@ -84,7 +84,7 @@ Designed for quiet, non-intrusive playback. See the generated [filter-62db.md](f
 | 8 | High Shelf | 10000 | 0.93 | 0.71 |
 | 9 | High Shelf | 16000 | 1.17 | 0.71 |
 
-![62 dB Frequency Response](filter-62db.png)
+![62 dB Frequency Response](images/filter-62db.png)
 
 ---
 
@@ -106,7 +106,7 @@ Designed for casual, extended listening sessions. See the generated [filter-75db
 | 8 | High Shelf | 10000 | 0.36 | 0.71 |
 | 9 | High Shelf | 16000 | 0.44 | 0.71 |
 
-![75 dB Frequency Response](filter-75db.png)
+![75 dB Frequency Response](images/filter-75db.png)
 
 ---
 
@@ -128,4 +128,4 @@ Designed for active demo sessions. Since this level is above the 83 dB reference
 | 8 | High Shelf | 10000 | -0.18 | 0.71 |
 | 9 | High Shelf | 16000 | -0.22 | 0.71 |
 
-![87 dB Frequency Response](filter-87db.png)
+![87 dB Frequency Response](images/filter-87db.png)
