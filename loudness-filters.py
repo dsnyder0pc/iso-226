@@ -10,75 +10,57 @@ table file, and plots the combined frequency response to a PNG file.
 # pylint: disable=invalid-name
 
 import argparse
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import freqz
+from scipy.optimize import curve_fit
+from iso226_utils import ISO_FREQ, iso226_spl, get_filter_response
 
 # Standard reference level for flat playback
 REF_LEVEL = 83.0
 
-# Base EQ profile calculated for a 65 dB target (18 dB difference from reference)
-# Format: (Type, Frequency, Gain_at_65dB, Q)
+# Base EQ filter structure (frequencies and Q factors) used for curve fitting optimization
 BASE_FILTERS = [
-    ('Low Shelf', 35, 2.5, 0.71),
-    ('Low Shelf', 75, 2.5, 0.71),
-    ('Peak', 150, 1.0, 0.70),
-    ('Peak', 300, 0.5, 1.00),
-    ('Peak', 600, 0.2, 1.40),
+    ('Low Shelf', 35, 0.0, 0.71),
+    ('Low Shelf', 75, 0.0, 0.71),
+    ('Peak', 150, 0.0, 0.70),
+    ('Peak', 300, 0.0, 1.00),
+    ('Peak', 600, 0.0, 1.40),
     ('Peak', 1000, 0.0, 1.00),
-    ('Peak', 3000, 0.2, 1.40),
-    ('Peak', 6000, 0.5, 1.00),
-    ('High Shelf', 10000, 0.8, 0.71),
-    ('High Shelf', 16000, 1.0, 0.71),
+    ('Peak', 3000, 0.0, 1.40),
+    ('Peak', 6000, 0.0, 1.00),
+    ('High Shelf', 10000, 0.0, 0.71),
+    ('High Shelf', 16000, 0.0, 0.71),
 ]
 
 
-def get_biquad_coefs(ftype, fc, fs, gain, q):
-    """Generates biquad coefficients based on Robert Bristow-Johnson's Audio EQ Cookbook."""
-    a_val = 10 ** (gain / 40.0)
-    w0 = 2 * np.pi * fc / fs
-    alpha = np.sin(w0) / (2 * q)
-
-    if gain == 0:
-        return [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]
-
-    if ftype == 'Peak':
-        b0 = 1 + alpha * a_val
-        b1 = -2 * np.cos(w0)
-        b2 = 1 - alpha * a_val
-        a0 = 1 + alpha / a_val
-        a1 = -2 * np.cos(w0)
-        a2 = 1 - alpha / a_val
-    elif ftype == 'Low Shelf':
-        b0 = a_val * ((a_val + 1) - (a_val - 1) * np.cos(w0) + 2 * np.sqrt(a_val) * alpha)
-        b1 = 2 * a_val * ((a_val - 1) - (a_val + 1) * np.cos(w0))
-        b2 = a_val * ((a_val + 1) - (a_val - 1) * np.cos(w0) - 2 * np.sqrt(a_val) * alpha)
-        a0 = (a_val + 1) + (a_val - 1) * np.cos(w0) + 2 * np.sqrt(a_val) * alpha
-        a1 = -2 * ((a_val - 1) + (a_val + 1) * np.cos(w0))
-        a2 = (a_val + 1) + (a_val - 1) * np.cos(w0) - 2 * np.sqrt(a_val) * alpha
-    elif ftype == 'High Shelf':
-        b0 = a_val * ((a_val + 1) + (a_val - 1) * np.cos(w0) + 2 * np.sqrt(a_val) * alpha)
-        b1 = -2 * a_val * ((a_val - 1) + (a_val + 1) * np.cos(w0))
-        b2 = a_val * ((a_val + 1) - (a_val - 1) * np.cos(w0) - 2 * np.sqrt(a_val) * alpha)
-        a0 = (a_val + 1) - (a_val - 1) * np.cos(w0) + 2 * np.sqrt(a_val) * alpha
-        a1 = 2 * ((a_val - 1) - (a_val + 1) * np.cos(w0))
-        a2 = (a_val + 1) - (a_val - 1) * np.cos(w0) - 2 * np.sqrt(a_val) * alpha
-    else:
-        raise ValueError(f"Unsupported filter type: {ftype}")
-
-    return [b0/a0, b1/a0, b2/a0], [1.0, a1/a0, a2/a0]
+def fit_model(freqs, *gains):
+    """Model function for curve fitting. Calculates filter response for a given array of gains."""
+    filters = []
+    for i, (ftype, fc, _, q_val) in enumerate(BASE_FILTERS):
+        filters.append((ftype, fc, gains[i], q_val))
+    return get_filter_response(filters, freqs)
 
 
 def calculate_filters_for_level(target_level):
-    """Scales the baseline 65dB EQ profile to the requested target level."""
-    # Scale factor based on how far we are from 83 dB compared to 65 dB
-    scale = (REF_LEVEL - target_level) / (REF_LEVEL - 65.0)
+    """Optimizes the EQ profile to fit the ISO 226 target delta curve at the requested target level."""
+    # 1. Calculate the ideal delta curve
+    ref_spl = iso226_spl(REF_LEVEL, ISO_FREQ)
+    target_spl = iso226_spl(target_level, ISO_FREQ)
 
+    # Delta curve normalized at 1000 Hz (index 17 in standard preferred frequencies)
+    ideal_delta = (target_spl - target_spl[17]) - (ref_spl - ref_spl[17])
+
+    # 2. Fit the filter gains using scipy.optimize.curve_fit
+    initial_guess = [0.0] * len(BASE_FILTERS)
+    optimized_gains, _ = curve_fit(fit_model, ISO_FREQ, ideal_delta, p0=initial_guess)
+
+    # 3. Round and filter out zero-gain bands
     scaled_filters = []
-    for ftype, fc, base_gain, q in BASE_FILTERS:
-        scaled_gain = round(base_gain * scale, 2)
+    for i, (ftype, fc, _, q_val) in enumerate(BASE_FILTERS):
+        scaled_gain = round(optimized_gains[i], 2)
         if scaled_gain != 0.0:
-            scaled_filters.append((ftype, fc, scaled_gain, q))
+            scaled_filters.append((ftype, fc, scaled_gain, q_val))
 
     return scaled_filters
 
@@ -88,12 +70,7 @@ def calculate_headroom_offset(filters, fs=48000):
     if not filters:
         return 0.0
     frequencies = np.logspace(np.log10(20), np.log10(20000), 1000)
-    w_eval = 2 * np.pi * frequencies / fs
-    total_h = np.ones(len(frequencies), dtype=complex)
-    for filt in filters:
-        b, a = get_biquad_coefs(filt[0], filt[1], fs, filt[2], filt[3])
-        total_h *= freqz(b, a, worN=w_eval)[1]
-    response_db = 20 * np.log10(np.abs(total_h))
+    response_db = get_filter_response(filters, frequencies, fs)
     max_gain = np.max(response_db)
     if max_gain > 0.0:
         return -round(max_gain, 2)
@@ -132,17 +109,9 @@ def write_markdown_table(filters, level, headroom_offset=0.0):
 def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000):
     """Plots the combined frequency response of the PEQ filters and saves to PNG."""
     frequencies = np.logspace(np.log10(20), np.log10(20000), 1000)
-    w_eval = 2 * np.pi * frequencies / fs
-
-    # Initialize total frequency response array
-    total_h = np.ones(len(frequencies), dtype=complex)
-
-    for filt in filters:
-        b, a = get_biquad_coefs(filt[0], filt[1], fs, filt[2], filt[3])
-        total_h *= freqz(b, a, worN=w_eval)[1]
 
     # Convert magnitude to dB and apply headroom offset
-    response_db = 20 * np.log10(np.abs(total_h)) + headroom_offset
+    response_db = get_filter_response(filters, frequencies, fs) + headroom_offset
 
     # Plot setup
     plt.figure(figsize=(12, 6))
@@ -182,8 +151,12 @@ def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000):
 
     plt.tight_layout()
     level_str = f"{int(level)}" if level.is_integer() else f"{level}"
-    output_file = f"filter-{level_str}db.png"
+    if os.path.exists("images"):
+        output_file = os.path.join("images", f"filter-{level_str}db.png")
+    else:
+        output_file = f"filter-{level_str}db.png"
     plt.savefig(output_file, dpi=150)
+    plt.close()
     print(f"Saved frequency response plot to: {output_file}")
 
 
