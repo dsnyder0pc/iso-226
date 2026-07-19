@@ -79,7 +79,7 @@ ipython_config.py
 # pyenv
 # Recommend excluding this if it represents a local-only setup.
 # Uncomment the line below to ignore it:
-# .python-version
+.python-version
 
 # pipenv
 #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
