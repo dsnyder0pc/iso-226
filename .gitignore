@@ -140,3 +140,9 @@ cython_debug/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Equal-Loudness compensation PEQ generated files
+filter-*db.md
+filter-*db.png
+!images/filter-*db.png
+

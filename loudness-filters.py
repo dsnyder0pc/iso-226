@@ -10,7 +10,6 @@ table file, and plots the combined frequency response to a PNG file.
 # pylint: disable=invalid-name
 
 import argparse
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
@@ -151,10 +150,7 @@ def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000):
 
     plt.tight_layout()
     level_str = f"{int(level)}" if level.is_integer() else f"{level}"
-    if os.path.exists("images"):
-        output_file = os.path.join("images", f"filter-{level_str}db.png")
-    else:
-        output_file = f"filter-{level_str}db.png"
+    output_file = f"filter-{level_str}db.png"
     plt.savefig(output_file, dpi=150)
     plt.close()
     print(f"Saved frequency response plot to: {output_file}")
