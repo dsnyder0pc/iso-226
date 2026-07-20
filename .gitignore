@@ -144,8 +144,9 @@ Thumbs.db
 # Equal-Loudness compensation PEQ generated files
 filter-*db.md
 filter-*db.png
-filter-*db.txt
 !images/filter-*db.png
+filter-*db.txt
+!REW/filter-*db.txt
 
 # Filter Error Plots
 iso_226_filter_error_for_*db.png
