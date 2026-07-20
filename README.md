@@ -100,15 +100,16 @@ Pre-generated YAML filter files for standard levels are available in the [REW](R
 2. Under the Equaliser tab on the right panel, select **CamillaDSP** as the **Manufacturer** and **Filters** as the **Model**.
 3. Under **Filter Tasks**, pick **Load filter settings from YAML file** (or select **File** > **Import filter settings** / **Open filters**) and choose your `filter-xxdb.yml` file (from the `REW/` directory or generated locally). REW will load all 10 filter bands (`LS Q`, `PK`, `HS Q`) into its active workspace.
 4. Once imported into REW, you can switch REW's **Equaliser** dropdown to any other target hardware model (e.g., *miniDSP*, *Generic*, etc.)—REW's conversion algorithms will automatically translate and rescale the frequency, gain, and Q boundaries to fit the destination device's limits.
-5. From REW, you can also select **File** > **Export** > **Export filters impulse response as WAV** to produce stereo WAV impulse response files for convolution engines (such as Roon Convolution or HQPlayer).
+5. From REW, you can also select **File** > **Export** > **Export filters impulse response as WAV** to produce stereo WAV impulse response files. When prompted by REW, select the sample rate that matches your media library/playback system (typically 44.1 kHz or 48 kHz) and choose 32-bit float mono or stereo format as required by your convolution engine (e.g., Roon Convolution, HQPlayer, or JRiver).
 
 #### Handling Headroom Adjustment & Preamp Reduction
 Because equal-loudness filters apply positive gain at low and high frequencies, a global negative preamp gain (headroom adjustment) is required to prevent digital clipping:
-*   Each generated file documents the target playback level and required headroom adjustment (e.g., `-9.16 dB` for 65 dB).
-*   When using **Roon**, **REW**, **Equalizer APO**, or hardware DSPs (e.g., miniDSP), apply this negative preamp gain in your software/device headroom setting or input gain configuration to ensure peak response stays at or below 0 dB.
+*   Each generated file (both `.md` tables and `.yml` files) documents the target playback level and required headroom adjustment (e.g., `-9.37 dB` for 65 dB).
+*   When using **Roon**, **Equalizer APO**, or hardware DSPs (e.g., miniDSP), enter the negative gain into your DSP headroom management setting or input gain configuration to ensure peak response stays at or below 0 dB.
+*   **Verification**: After importing into REW or entering parameters into your DSP processor, visually verify that the global preamp / headroom reduction matches the recommended offset documented in the `.md` preset files.
 
-#### Manual Entry for Other DSPs
-*   **Manual PEQ Entry**: Manually enter the filter parameters (frequency, gain, Q) from the generated Markdown tables (e.g. [filter-65db.md](filter-65db.md)) into your Parametric EQ processor (such as Roon's Parametric EQ or Equalizer APO), and set **Headroom Management** to the recommended negative gain offset.
+#### Manual Entry for Roon & Other DSPs
+*   **Roon & Manual PEQ Entry**: For users entering filters directly into Roon's Parametric EQ processor, Equalizer APO, or hardware DSP interfaces, copy the filter parameters (Band Type, Center Frequency, Gain, Q) directly from the formatted Markdown tables (e.g. [filter-65db.md](filter-65db.md), [filter-75db.md](filter-75db.md), [filter-85db.md](filter-85db.md)) and enable **Headroom Management** set to the recommended negative gain offset.
 
 ---
 
