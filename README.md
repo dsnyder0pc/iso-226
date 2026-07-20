@@ -28,17 +28,17 @@ Because equal-loudness compensation requires boosts in the low and high frequenc
 This project implements **Option 2**. The generator calculates the exact peak gain of the combined response and outputs the recommended negative preamp offset to ensure the entire filter curve remains at or below `0 dB`.
 
 ### Pre-generated REW Filters (No Python Required)
-For users who do not have a Python environment or prefer not to run scripts, pre-generated filter text files for common listening levels (55 dB through 95 dB) are available directly in the [REW](file:///home/dsnyder/src/iso-226/REW) directory:
+For users who do not have a Python environment or prefer not to run scripts, pre-generated filter text files for common listening levels (55 dB through 95 dB) are available directly in the [REW](REW) directory:
 
-*   [filter-55db.txt](file:///home/dsnyder/src/iso-226/REW/filter-55db.txt) (55 dB SPL)
-*   [filter-60db.txt](file:///home/dsnyder/src/iso-226/REW/filter-60db.txt) (60 dB SPL)
-*   [filter-65db.txt](file:///home/dsnyder/src/iso-226/REW/filter-65db.txt) (65 dB SPL - Low / Quiet)
-*   [filter-70db.txt](file:///home/dsnyder/src/iso-226/REW/filter-70db.txt) (70 dB SPL)
-*   [filter-75db.txt](file:///home/dsnyder/src/iso-226/REW/filter-75db.txt) (75 dB SPL - Medium / Casual)
-*   [filter-80db.txt](file:///home/dsnyder/src/iso-226/REW/filter-80db.txt) (80 dB SPL)
-*   [filter-85db.txt](file:///home/dsnyder/src/iso-226/REW/filter-85db.txt) (85 dB SPL - High / Loud)
-*   [filter-90db.txt](file:///home/dsnyder/src/iso-226/REW/filter-90db.txt) (90 dB SPL)
-*   [filter-95db.txt](file:///home/dsnyder/src/iso-226/REW/filter-95db.txt) (95 dB SPL)
+*   [filter-55db.txt](REW/filter-55db.txt) (55 dB SPL)
+*   [filter-60db.txt](REW/filter-60db.txt) (60 dB SPL)
+*   [filter-65db.txt](REW/filter-65db.txt) (65 dB SPL - Low / Quiet)
+*   [filter-70db.txt](REW/filter-70db.txt) (70 dB SPL)
+*   [filter-75db.txt](REW/filter-75db.txt) (75 dB SPL - Medium / Casual)
+*   [filter-80db.txt](REW/filter-80db.txt) (80 dB SPL)
+*   [filter-85db.txt](REW/filter-85db.txt) (85 dB SPL - High / Loud)
+*   [filter-90db.txt](REW/filter-90db.txt) (90 dB SPL)
+*   [filter-95db.txt](REW/filter-95db.txt) (95 dB SPL)
 
 You can download and import these text files directly into Room EQ Wizard (REW) or Equalizer APO without installing Python.
 
@@ -47,7 +47,7 @@ You can download and import these text files directly into Room EQ Wizard (REW) 
 ## How It Works
 
 1.  **Ideal Target Calculation**: Using standard ISO 226 coefficients, the ideal SPL curve is calculated for both the target playback level and the 83 dB reference level.
-2.  **Optimization/Curve Fitting**: The target gains for the [BASE_FILTERS](file:///home/dsnyder/src/iso-226/loudness-filters.py#L28) are optimized using `scipy.optimize.curve_fit` to closely match the ideal delta curve.
+2.  **Optimization/Curve Fitting**: The target gains for the base filters in `loudness-filters.py` are optimized using `scipy.optimize.curve_fit` to closely match the ideal delta curve.
 3.  **Biquad Calculation**: Using Robert Bristow-Johnson's Audio EQ Cookbook formulas implemented in `get_biquad_coefs`, it designs digital biquad filter coefficients for low-shelf, high-shelf, and peak filters.
 4.  **Headroom Calculation**: Evaluates the combined response and computes the required negative headroom offset to keep peak gain below 0 dB.
 5.  **Visualization & Output Files**: Generates frequency response plots, outputs formatted Markdown tables, and produces REW-compatible filter text files (`filter-xxdb.txt`).
@@ -56,7 +56,7 @@ You can download and import these text files directly into Room EQ Wizard (REW) 
 
 ## Requirements (Optional for Custom Levels)
 
-If you want to generate custom target levels using Python, ensure you have Python 3 and the dependencies listed in [requirements.txt](file:///home/dsnyder/src/iso-226/requirements.txt) installed:
+If you want to generate custom target levels using Python, ensure you have Python 3 and the dependencies listed in [requirements.txt](requirements.txt) installed:
 
 ```bash
 pip install -r requirements.txt
@@ -92,7 +92,7 @@ python check.py --level <target_db>
 *   It saves an error deviation plot as `iso_226_filter_error_for_xxdb.png`.
 
 ### 3. Importing Filters into Room EQ Wizard (REW) & DSP Software
-Pre-generated filter files for standard levels are available in the [REW](file:///home/dsnyder/src/iso-226/REW) directory, or you can generate custom `.txt` files using `loudness-filters.py`.
+Pre-generated filter files for standard levels are available in the [REW](REW) directory, or you can generate custom `.txt` files using `loudness-filters.py`.
 
 #### Handling Headroom Adjustment & Preamp Reduction
 Because equal-loudness filters apply positive gain at low and high frequencies, a global negative preamp gain (headroom adjustment) is required to prevent digital clipping:
@@ -100,11 +100,16 @@ Because equal-loudness filters apply positive gain at low and high frequencies, 
 *   It also includes an explicit `Preamp: -X.XX dB` line at the top. Tools like **Equalizer APO** parse `Preamp:` natively upon import.
 *   When using **REW**, **Roon**, or hardware DSPs (e.g., miniDSP), apply this negative preamp gain in your software/device headroom setting or input gain configuration to ensure peak response stays at or below 0 dB.
 
-#### Importing into REW:
+#### Importing into REW & Hardware/Software DSPs:
 1. Open **Room EQ Wizard (REW)** and navigate to the **EQ** window.
 2. In the EQ window menu bar, select **File** > **Import filter settings** (or **Open filters**) and select your `filter-xxdb.txt` file (from the `REW/` folder or generated locally).
 3. Select your target hardware from the **Equaliser** dropdown menu at the top of the EQ window (e.g., *Generic*, *miniDSP 2x4 HD*, etc.). REW will automatically adapt the generic filters to your specific device capabilities.
 4. From REW, you can export the filters directly to your DSP device (e.g. biquad coefficients or XML for miniDSP) or export stereo WAV impulse response files for convolution engines like Roon or HQPlayer.
+
+#### Note for Roon Users:
+Roon cannot natively import generic `.txt` filter files directly into its Parametric EQ interface. Roon users have two options:
+*   **Manual PEQ Entry**: Manually enter the filter parameters (frequency, gain, Q) from the generated Markdown tables (e.g. [filter-65db.md](filter-65db.md)) into Roon's Parametric EQ processor, and set Roon's **Headroom Management** to the recommended negative gain offset.
+*   **Convolution Engine (WAV IR)**: Import the `filter-xxdb.txt` file into REW, then in REW select **File** > **Export** > **Export filters impulse response as WAV** (creating a stereo WAV file at your desired sample rate). Load this WAV file directly into Roon's **Convolution** engine.
 
 ---
 
@@ -144,7 +149,7 @@ $$\text{Max Residual Error} = \max_{f \in \text{Standard Frequencies}} \left| \t
 Below are the pre-generated PEQ tables and frequency responses for the three primary listening scenarios. You can copy these settings directly into Roon's Parametric EQ processor.
 
 ### 1. Low Level (65 dB)
-Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](file:///home/dsnyder/src/iso-226/filter-65db.md) for details.
+Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](filter-65db.md) for details.
 
 *   **Reference Level**: 83.0 dB
 *   **Recommended Headroom Adjustment (Preamp Gain)**: `-9.16 dB`
@@ -167,7 +172,7 @@ Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](f
 ---
 
 ### 2. Medium Level (75 dB)
-Designed for casual, extended listening sessions. See the generated [filter-75db.md](file:///home/dsnyder/src/iso-226/filter-75db.md) for details.
+Designed for casual, extended listening sessions. See the generated [filter-75db.md](filter-75db.md) for details.
 
 *   **Reference Level**: 83.0 dB
 *   **Recommended Headroom Adjustment (Preamp Gain)**: `-4.78 dB`
@@ -190,7 +195,7 @@ Designed for casual, extended listening sessions. See the generated [filter-75db
 ---
 
 ### 3. High Level (85 dB)
-Designed for active demo sessions. Since this level is above the 83 dB reference, it applies only minor attenuation relative to the reference. See the generated [filter-85db.md](file:///home/dsnyder/src/iso-226/filter-85db.md) for details.
+Designed for active demo sessions. Since this level is above the 83 dB reference, it applies only minor attenuation relative to the reference. See the generated [filter-85db.md](filter-85db.md) for details.
 
 *   **Reference Level**: 83.0 dB
 *   **Recommended Headroom Adjustment (Preamp Gain)**: `-0.09 dB`
