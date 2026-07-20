@@ -27,6 +27,21 @@ Because equal-loudness compensation requires boosts in the low and high frequenc
 
 This project implements **Option 2**. The generator calculates the exact peak gain of the combined response and outputs the recommended negative preamp offset to ensure the entire filter curve remains at or below `0 dB`.
 
+### Pre-generated REW Filters (No Python Required)
+For users who do not have a Python environment or prefer not to run scripts, pre-generated filter text files for common listening levels (55 dB through 95 dB) are available directly in the [REW](file:///home/dsnyder/src/iso-226/REW) directory:
+
+*   [filter-55db.txt](file:///home/dsnyder/src/iso-226/REW/filter-55db.txt) (55 dB SPL)
+*   [filter-60db.txt](file:///home/dsnyder/src/iso-226/REW/filter-60db.txt) (60 dB SPL)
+*   [filter-65db.txt](file:///home/dsnyder/src/iso-226/REW/filter-65db.txt) (65 dB SPL - Low / Quiet)
+*   [filter-70db.txt](file:///home/dsnyder/src/iso-226/REW/filter-70db.txt) (70 dB SPL)
+*   [filter-75db.txt](file:///home/dsnyder/src/iso-226/REW/filter-75db.txt) (75 dB SPL - Medium / Casual)
+*   [filter-80db.txt](file:///home/dsnyder/src/iso-226/REW/filter-80db.txt) (80 dB SPL)
+*   [filter-85db.txt](file:///home/dsnyder/src/iso-226/REW/filter-85db.txt) (85 dB SPL - High / Loud)
+*   [filter-90db.txt](file:///home/dsnyder/src/iso-226/REW/filter-90db.txt) (90 dB SPL)
+*   [filter-95db.txt](file:///home/dsnyder/src/iso-226/REW/filter-95db.txt) (95 dB SPL)
+
+You can download and import these text files directly into Room EQ Wizard (REW) or Equalizer APO without installing Python.
+
 ---
 
 ## How It Works
@@ -39,9 +54,9 @@ This project implements **Option 2**. The generator calculates the exact peak ga
 
 ---
 
-## Requirements
+## Requirements (Optional for Custom Levels)
 
-Ensure you have Python 3 and the dependencies listed in [requirements.txt](file:///home/dsnyder/src/iso-226/requirements.txt) installed:
+If you want to generate custom target levels using Python, ensure you have Python 3 and the dependencies listed in [requirements.txt](file:///home/dsnyder/src/iso-226/requirements.txt) installed:
 
 ```bash
 pip install -r requirements.txt
@@ -51,7 +66,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-### 1. Generate PEQ Filters
+### 1. Generate Custom PEQ Filters
 Run the generator script by specifying your target average listening level in dB:
 
 ```bash
@@ -77,17 +92,17 @@ python check.py --level <target_db>
 *   It saves an error deviation plot as `iso_226_filter_error_for_xxdb.png`.
 
 ### 3. Importing Filters into Room EQ Wizard (REW) & DSP Software
-In addition to Markdown tables and PNG plots, `loudness-filters.py` outputs `filter-xxdb.txt` files formatted as REW Generic EQ text files.
+Pre-generated filter files for standard levels are available in the [REW](file:///home/dsnyder/src/iso-226/REW) directory, or you can generate custom `.txt` files using `loudness-filters.py`.
 
 #### Handling Headroom Adjustment & Preamp Reduction
 Because equal-loudness filters apply positive gain at low and high frequencies, a global negative preamp gain (headroom adjustment) is required to prevent digital clipping:
-*   The generated `.txt` file includes a `Notes:` header line documenting the target level and required headroom adjustment (e.g., `-9.16 dB` for 65 dB).
+*   Each `.txt` file includes a `Notes:` header line documenting the target level and required headroom adjustment (e.g., `-9.16 dB` for 65 dB).
 *   It also includes an explicit `Preamp: -X.XX dB` line at the top. Tools like **Equalizer APO** parse `Preamp:` natively upon import.
 *   When using **REW**, **Roon**, or hardware DSPs (e.g., miniDSP), apply this negative preamp gain in your software/device headroom setting or input gain configuration to ensure peak response stays at or below 0 dB.
 
 #### Importing into REW:
 1. Open **Room EQ Wizard (REW)** and navigate to the **EQ** window.
-2. In the EQ window menu bar, select **File** > **Import filter settings** (or **Open filters**) and select the generated `filter-xxdb.txt` file.
+2. In the EQ window menu bar, select **File** > **Import filter settings** (or **Open filters**) and select your `filter-xxdb.txt` file (from the `REW/` folder or generated locally).
 3. Select your target hardware from the **Equaliser** dropdown menu at the top of the EQ window (e.g., *Generic*, *miniDSP 2x4 HD*, etc.). REW will automatically adapt the generic filters to your specific device capabilities.
 4. From REW, you can export the filters directly to your DSP device (e.g. biquad coefficients or XML for miniDSP) or export stereo WAV impulse response files for convolution engines like Roon or HQPlayer.
 
