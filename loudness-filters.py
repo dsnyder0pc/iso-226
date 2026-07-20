@@ -105,6 +105,36 @@ def write_markdown_table(filters, level, headroom_offset=0.0):
     print(f"Saved PEQ table to: {filename}")
 
 
+def write_rew_file(filters, level, headroom_offset=0.0):
+    """Writes PEQ filters to a text file formatted for Room EQ Wizard (REW) import."""
+    level_str = f"{int(level)}" if level.is_integer() else f"{level}"
+    filename = f"filter-{level_str}db.txt"
+
+    type_map = {
+        'Low Shelf': 'LS',
+        'High Shelf': 'HS',
+        'Peak': 'PK',
+    }
+
+    lines = [
+        f"Notes: Equal-Loudness Compensation EQ for {level} dB "
+        f"(Reference Level: {REF_LEVEL} dB, Headroom Adjustment: {headroom_offset:.2f} dB)",
+        "Equaliser: Generic\n"
+    ]
+
+    if headroom_offset != 0.0:
+        lines.append(f"Preamp: {headroom_offset:.2f} dB")
+
+    for i, (ftype, fc, gain, q_val) in enumerate(filters, 1):
+        lines.append(
+            f"Filter {i}: ON {type_map.get(ftype, 'PK')} Fc {fc:.1f} Hz Gain {gain:.2f} dB Q {q_val:.2f}"
+        )
+
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"Saved REW filter text file to: {filename}")
+
+
 def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000):
     """Plots the combined frequency response of the PEQ filters and saves to PNG."""
     frequencies = np.logspace(np.log10(20), np.log10(20000), 1000)
@@ -165,4 +195,5 @@ if __name__ == "__main__":
     target_filters = calculate_filters_for_level(args.level)
     offset = calculate_headroom_offset(target_filters)
     write_markdown_table(target_filters, args.level, offset)
+    write_rew_file(target_filters, args.level, offset)
     plot_frequency_response(target_filters, args.level, offset)

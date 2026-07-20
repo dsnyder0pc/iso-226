@@ -35,7 +35,7 @@ This project implements **Option 2**. The generator calculates the exact peak ga
 2.  **Optimization/Curve Fitting**: The target gains for the [BASE_FILTERS](file:///home/dsnyder/src/iso-226/loudness-filters.py#L28) are optimized using `scipy.optimize.curve_fit` to closely match the ideal delta curve.
 3.  **Biquad Calculation**: Using Robert Bristow-Johnson's Audio EQ Cookbook formulas implemented in `get_biquad_coefs`, it designs digital biquad filter coefficients for low-shelf, high-shelf, and peak filters.
 4.  **Headroom Calculation**: Evaluates the combined response and computes the required negative headroom offset to keep peak gain below 0 dB.
-5.  **Visualization & Tables**: Generates frequency response plots and outputs a formatted Markdown table detailing the PEQ bands and the required headroom adjustment offset.
+5.  **Visualization & Output Files**: Generates frequency response plots, outputs formatted Markdown tables, and produces REW-compatible filter text files (`filter-xxdb.txt`).
 
 ---
 
@@ -60,6 +60,11 @@ python loudness-filters.py --level <target_db>
 
 *   `--level` (float, default: `65.0`): The target average room sound pressure level (SPL) in dB.
 
+Running the script generates three files for the requested level:
+*   `filter-xxdb.md`: A Markdown table of the PEQ filters and recommended headroom adjustment.
+*   `filter-xxdb.txt`: Filter settings in REW Generic EQ text format.
+*   `filter-xxdb.png`: Frequency response plot.
+
 ### 2. Verify Residual Error
 Run the verification script to check the deviation of the PEQ filters against the ideal contours:
 
@@ -70,6 +75,21 @@ python check.py --level <target_db>
 *   If the corresponding `filter-xxdb.md` does not exist, the script automatically invokes `loudness-filters.py` to generate it.
 *   It calculates and outputs the maximum residual error to the terminal.
 *   It saves an error deviation plot as `iso_226_filter_error_for_xxdb.png`.
+
+### 3. Importing Filters into Room EQ Wizard (REW) & DSP Software
+In addition to Markdown tables and PNG plots, `loudness-filters.py` outputs `filter-xxdb.txt` files formatted as REW Generic EQ text files.
+
+#### Handling Headroom Adjustment & Preamp Reduction
+Because equal-loudness filters apply positive gain at low and high frequencies, a global negative preamp gain (headroom adjustment) is required to prevent digital clipping:
+*   The generated `.txt` file includes a `Notes:` header line documenting the target level and required headroom adjustment (e.g., `-9.16 dB` for 65 dB).
+*   It also includes an explicit `Preamp: -X.XX dB` line at the top. Tools like **Equalizer APO** parse `Preamp:` natively upon import.
+*   When using **REW**, **Roon**, or hardware DSPs (e.g., miniDSP), apply this negative preamp gain in your software/device headroom setting or input gain configuration to ensure peak response stays at or below 0 dB.
+
+#### Importing into REW:
+1. Open **Room EQ Wizard (REW)** and navigate to the **EQ** window.
+2. In the EQ window menu bar, select **File** > **Import filter settings** (or **Open filters**) and select the generated `filter-xxdb.txt` file.
+3. Select your target hardware from the **Equaliser** dropdown menu at the top of the EQ window (e.g., *Generic*, *miniDSP 2x4 HD*, etc.). REW will automatically adapt the generic filters to your specific device capabilities.
+4. From REW, you can export the filters directly to your DSP device (e.g. biquad coefficients or XML for miniDSP) or export stereo WAV impulse response files for convolution engines like Roon or HQPlayer.
 
 ---
 
