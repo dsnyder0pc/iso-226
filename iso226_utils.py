@@ -1,11 +1,11 @@
 """
-ISO 226:2003 equal-loudness contours and biquad filter calculation helper.
+ISO 226 equal-loudness contours and biquad filter calculation helper.
 """
 
 import numpy as np
 from scipy.signal import freqz
 
-# ISO 226:2003 Standard Coefficients for Preferred Frequencies
+# ISO 226 Standard Coefficients for Preferred Frequencies
 ISO_FREQ = np.array([
     20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0, 200.0,
     250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0, 1600.0,
@@ -25,14 +25,14 @@ ISO_LU = np.array([
 ])
 
 ISO_TF = np.array([
-    78.5, 68.7, 59.5, 51.1, 44.0, 37.5, 31.5, 26.5, 22.1, 17.9,
+    78.1, 68.7, 59.5, 51.1, 44.0, 37.5, 31.5, 26.5, 22.1, 17.9,
     14.4, 11.4, 8.6, 6.2, 4.4, 3.0, 2.2, 2.4, 3.5, 1.7,
     -1.3, -4.2, -6.0, -5.4, -1.5, 6.0, 12.6, 13.9, 12.3
 ])
 
 
 def iso226_spl(phon, f_arr=None):
-    """Calculates Sound Pressure Level (dB SPL) for a given phon level per ISO 226:2003.
+    """Calculates Sound Pressure Level (dB SPL) for a given phon level per ISO 226.
 
     Args:
         phon (float): Phon level.
@@ -47,7 +47,7 @@ def iso226_spl(phon, f_arr=None):
     lu = np.interp(f_arr, ISO_FREQ, ISO_LU)
     tf = np.interp(f_arr, ISO_FREQ, ISO_TF)
 
-    # Official ISO 226:2003 standard formula
+    # Official ISO 226 standard formula
     term1 = 4.47e-3 * (10**(0.025 * phon) - 1.15)
     term2 = (0.4 * 10**(((tf + lu) / 10.0) - 9.0))**af
     a_f = term1 + term2

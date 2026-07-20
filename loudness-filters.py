@@ -10,9 +10,10 @@ table file, and plots the combined frequency response to a PNG file.
 # pylint: disable=invalid-name
 
 import argparse
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, minimize
 from iso226_utils import ISO_FREQ, iso226_spl, get_filter_response
 
 # Standard reference level for flat playback
@@ -33,16 +34,11 @@ BASE_FILTERS = [
 ]
 
 
-def fit_model(freqs, *gains):
-    """Model function for curve fitting. Calculates filter response for a given array of gains."""
-    filters = []
-    for i, (ftype, fc, _, q_val) in enumerate(BASE_FILTERS):
-        filters.append((ftype, fc, gains[i], q_val))
-    return get_filter_response(filters, freqs)
-
-
 def calculate_filters_for_level(target_level):
-    """Optimizes the EQ profile to fit the ISO 226 target delta curve at the requested target level."""
+    """Optimizes the EQ profile to fit the ISO 226 target delta curve at the requested target level,
+
+    minimizing maximum residual error across preferred frequencies.
+    """
     # 1. Calculate the ideal delta curve
     ref_spl = iso226_spl(REF_LEVEL, ISO_FREQ)
     target_spl = iso226_spl(target_level, ISO_FREQ)
@@ -50,16 +46,42 @@ def calculate_filters_for_level(target_level):
     # Delta curve normalized at 1000 Hz (index 17 in standard preferred frequencies)
     ideal_delta = (target_spl - target_spl[17]) - (ref_spl - ref_spl[17])
 
-    # 2. Fit the filter gains using scipy.optimize.curve_fit
-    initial_guess = [0.0] * len(BASE_FILTERS)
-    optimized_gains, _ = curve_fit(fit_model, ISO_FREQ, ideal_delta, p0=initial_guess)
+    # 2. Fit initial filter gains using scipy.optimize.curve_fit
+    def fit_gains(freqs, *gains):
+        filters = [(BASE_FILTERS[i][0], BASE_FILTERS[i][1], gains[i], BASE_FILTERS[i][3]) for i in range(len(BASE_FILTERS))]
+        return get_filter_response(filters, freqs)
 
-    # 3. Round and filter out zero-gain bands
+    initial_guess = [0.0] * len(BASE_FILTERS)
+    popt_gains, _ = curve_fit(fit_gains, ISO_FREQ, ideal_delta, p0=initial_guess)
+
+    # 3. Refine gains, center frequencies, and Q-values using SLSQP minimax optimization
+    def loss_inf(params):
+        gains = params[:10]
+        fcs = params[10:20]
+        qs = params[20:30]
+        filters = [(BASE_FILTERS[i][0], max(15.0, fcs[i]), gains[i], max(0.2, qs[i])) for i in range(10)]
+        resp = get_filter_response(filters, ISO_FREQ)
+        return np.max(np.abs(resp - ideal_delta))
+
+    init_fc = [f[1] for f in BASE_FILTERS]
+    init_q = [f[3] for f in BASE_FILTERS]
+    p0 = list(popt_gains) + init_fc + init_q
+    bounds = [(-30.0, 30.0)] * 10 + [(15.0, 20000.0)] * 10 + [(0.2, 5.0)] * 10
+
+    res = minimize(loss_inf, p0, method='SLSQP', bounds=bounds, options={'maxiter': 500})
+
+    gains_opt = res.x[:10]
+    fcs_opt = res.x[10:20]
+    qs_opt = res.x[20:30]
+
+    # 4. Round and filter out zero-gain bands
     scaled_filters = []
-    for i, (ftype, fc, _, q_val) in enumerate(BASE_FILTERS):
-        scaled_gain = round(optimized_gains[i], 2)
+    for i, (ftype, _, _, _) in enumerate(BASE_FILTERS):
+        fc_val = round(float(fcs_opt[i]), 1) if not float(fcs_opt[i]).is_integer() else int(fcs_opt[i])
+        scaled_gain = round(float(gains_opt[i]), 2)
+        q_val = round(float(qs_opt[i]), 2)
         if scaled_gain != 0.0:
-            scaled_filters.append((ftype, fc, scaled_gain, q_val))
+            scaled_filters.append((ftype, fc_val, scaled_gain, q_val))
 
     return scaled_filters
 
@@ -186,9 +208,17 @@ def write_camilladsp_yaml(filters, level, headroom_offset=0.0):
         lines.append(f"      gain: {gain:.2f}")
         lines.append(f"      q: {q_val:.2f}")
 
+    yaml_content = "\n".join(lines) + "\n"
     with open(filename, 'w', encoding='utf-8') as f:
-        f.write("\n".join(lines) + "\n")
+        f.write(yaml_content)
     print(f"Saved CamillaDSP YAML file to: {filename}")
+
+    rew_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'REW')
+    if os.path.exists(rew_dir):
+        rew_path = os.path.join(rew_dir, filename)
+        with open(rew_path, 'w', encoding='utf-8') as f:
+            f.write(yaml_content)
+        print(f"Saved CamillaDSP YAML file to: {rew_path}")
 
 
 if __name__ == "__main__":

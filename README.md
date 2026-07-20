@@ -151,20 +151,20 @@ Below are the pre-generated PEQ tables and frequency responses for the three pri
 Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](filter-65db.md) for details.
 
 *   **Reference Level**: 83.0 dB
-*   **Recommended Headroom Adjustment (Preamp Gain)**: `-9.16 dB`
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `-9.37 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 35 | 1.35 | 0.71 |
-| 2 | Low Shelf | 75 | 7.74 | 0.71 |
-| 3 | Peak | 150 | 4.13 | 0.70 |
-| 4 | Peak | 300 | 0.19 | 1.00 |
-| 5 | Peak | 600 | 0.42 | 1.40 |
-| 6 | Peak | 1000 | -0.57 | 1.00 |
-| 7 | Peak | 3000 | -0.50 | 1.40 |
-| 8 | Peak | 6000 | -1.09 | 1.00 |
-| 9 | High Shelf | 10000 | 3.64 | 0.71 |
-| 10 | High Shelf | 16000 | 4.73 | 0.71 |
+| 1 | Low Shelf | 34.8 | 1.71 | 0.68 |
+| 2 | Low Shelf | 75.2 | 7.79 | 0.54 |
+| 3 | Peak | 149.8 | 3.01 | 0.44 |
+| 4 | Peak | 300.3 | -0.06 | 0.98 |
+| 5 | Peak | 600.0 | 0.14 | 1.36 |
+| 6 | Peak | 1000.0 | -0.57 | 0.57 |
+| 7 | Peak | 3000.0 | -0.17 | 1.40 |
+| 8 | Peak | 6000.0 | -0.68 | 0.33 |
+| 9 | High Shelf | 10000.0 | 3.18 | 0.92 |
+| 10 | High Shelf | 16000.0 | 5.43 | 0.63 |
 
 ![65 dB Frequency Response](images/filter-65db.png)
 
@@ -174,20 +174,20 @@ Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](f
 Designed for casual, extended listening sessions. See the generated [filter-75db.md](filter-75db.md) for details.
 
 *   **Reference Level**: 83.0 dB
-*   **Recommended Headroom Adjustment (Preamp Gain)**: `-4.78 dB`
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `-4.82 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 35 | 0.66 | 0.71 |
-| 2 | Low Shelf | 75 | 3.32 | 0.71 |
-| 3 | Peak | 150 | 1.82 | 0.70 |
-| 4 | Peak | 300 | 0.02 | 1.00 |
-| 5 | Peak | 600 | 0.17 | 1.40 |
-| 6 | Peak | 1000 | -0.33 | 1.00 |
-| 7 | Peak | 3000 | -0.28 | 1.40 |
-| 8 | Peak | 6000 | -0.49 | 1.00 |
-| 9 | High Shelf | 10000 | 1.65 | 0.71 |
-| 10 | High Shelf | 16000 | 3.02 | 0.71 |
+| 1 | Low Shelf | 35.0 | 0.83 | 0.74 |
+| 2 | Low Shelf | 75.0 | 3.31 | 0.60 |
+| 3 | Peak | 150.0 | 1.58 | 0.51 |
+| 4 | Peak | 300.0 | -0.19 | 1.08 |
+| 5 | Peak | 600.0 | 0.14 | 1.41 |
+| 6 | Peak | 1000.0 | -0.35 | 0.99 |
+| 7 | Peak | 3000.0 | -0.29 | 1.39 |
+| 8 | Peak | 6000.0 | -0.49 | 0.97 |
+| 9 | High Shelf | 10000.0 | 1.65 | 0.75 |
+| 10 | High Shelf | 16000.0 | 3.01 | 0.73 |
 
 ![75 dB Frequency Response](images/filter-75db.png)
 
@@ -201,15 +201,16 @@ Designed for active demo sessions. Since this level is above the 83 dB reference
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 35 | -0.17 | 0.71 |
-| 2 | Low Shelf | 75 | -0.81 | 0.71 |
-| 3 | Peak | 150 | -0.45 | 0.70 |
-| 4 | Peak | 600 | -0.04 | 1.40 |
-| 5 | Peak | 1000 | 0.10 | 1.00 |
-| 6 | Peak | 3000 | 0.09 | 1.40 |
-| 7 | Peak | 6000 | 0.12 | 1.00 |
-| 8 | High Shelf | 10000 | -0.40 | 0.71 |
-| 9 | High Shelf | 16000 | -1.00 | 0.71 |
+| 1 | Low Shelf | 34.9 | -0.17 | 0.66 |
+| 2 | Low Shelf | 75.0 | -0.85 | 0.56 |
+| 3 | Peak | 150.0 | -0.35 | 0.50 |
+| 4 | Peak | 300.0 | 0.06 | 1.00 |
+| 5 | Peak | 600.0 | -0.03 | 1.40 |
+| 6 | Peak | 1000.0 | 0.11 | 1.00 |
+| 7 | Peak | 3000.0 | 0.09 | 1.40 |
+| 8 | Peak | 6000.0 | 0.13 | 1.00 |
+| 9 | High Shelf | 10000.0 | -0.40 | 0.71 |
+| 10 | High Shelf | 16000.0 | -0.99 | 0.71 |
 
 ![85 dB Frequency Response](images/filter-85db.png)
 
@@ -217,7 +218,7 @@ Designed for active demo sessions. Since this level is above the 83 dB reference
 
 ## References
 
-*   **ISO 226:2003 / ISO 226:2023 Standard**: *Acoustics — Normal equal-loudness-level contours*. International Organization for Standardization. [ISO 226 Specification](https://www.iso.org/standard/34222.html).
+*   **ISO 226:2023 Standard**: *Acoustics — Normal equal-loudness-level contours* (replaces ISO 226:2003). International Organization for Standardization. [ISO 226 Specification](https://www.iso.org/standard/83117.html).
 *   **Audio EQ Cookbook**: Bristow-Johnson, Robert. *Cookbook formulae for audio EQ biquad filter coefficients*. [W3C Audio WG / MusicDSP Cookbook](https://www.w3.org/TR/audio-eq-cookbook/).
 *   **Room EQ Wizard (REW) Documentation**: Mulcahy, John. *Room EQ Wizard User Guide — EQ Filters & Import/Export Formats*. [RE-Wizard Help](https://www.roomeqwizard.com/help/help_htm/eq/eq.html).
 *   **Equalizer APO Documentation**: Theamer, Jonas. *Equalizer APO Configuration & Scripting Reference*. [Equalizer APO Documentation](https://sourceforge.net/p/equalizerapo/wiki/Documentation/).
