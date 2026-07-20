@@ -1,74 +1,74 @@
 # Equal-Loudness Compensation EQ for 65.0 dB
-# Reference Level: 83.0 dB, Headroom Adjustment: -9.37 dB
+# Reference Level: 83.0 dB, Headroom Adjustment: -9.45 dB
 
 filters:
   band_1:
     type: Biquad
     parameters:
       type: Lowshelf
-      freq: 34.8
-      gain: 1.71
-      q: 0.68
+      freq: 35.0
+      gain: 1.89
+      q: 0.81
   band_2:
     type: Biquad
     parameters:
       type: Lowshelf
-      freq: 75.2
-      gain: 7.79
-      q: 0.54
+      freq: 75.1
+      gain: 7.64
+      q: 0.56
   band_3:
     type: Biquad
     parameters:
       type: Peaking
-      freq: 149.8
-      gain: 3.01
-      q: 0.44
+      freq: 150.0
+      gain: 3.26
+      q: 0.45
   band_4:
     type: Biquad
     parameters:
       type: Peaking
-      freq: 300.3
-      gain: -0.06
-      q: 0.98
+      freq: 300.0
+      gain: -0.37
+      q: 1.13
   band_5:
     type: Biquad
     parameters:
       type: Peaking
       freq: 600.0
-      gain: 0.14
-      q: 1.36
+      gain: 0.33
+      q: 1.44
   band_6:
     type: Biquad
     parameters:
       type: Peaking
       freq: 1000.0
-      gain: -0.57
-      q: 0.57
+      gain: -0.62
+      q: 0.93
   band_7:
     type: Biquad
     parameters:
       type: Peaking
       freq: 3000.0
-      gain: -0.17
-      q: 1.40
+      gain: -0.61
+      q: 1.39
   band_8:
     type: Biquad
     parameters:
       type: Peaking
       freq: 6000.0
-      gain: -0.68
-      q: 0.33
+      gain: -1.07
+      q: 0.98
   band_9:
     type: Biquad
     parameters:
       type: Highshelf
       freq: 10000.0
-      gain: 3.18
-      q: 0.92
+      gain: 3.40
+      q: 0.74
   band_10:
     type: Biquad
     parameters:
       type: Highshelf
       freq: 16000.0
-      gain: 5.43
-      q: 0.63
+      gain: 4.16
+      q: 0.74

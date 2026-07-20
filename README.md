@@ -1,6 +1,6 @@
 # ISO 226 Equal-Loudness Compensation PEQ Generator
 
-This repository provides a utility to generate Parametric EQ (PEQ) filters that compensate for the human ear's frequency response variation at different playback levels. The filters track the **ISO 226 equal-loudness contours** relative to a reference level of 83 dB SPL (Sound Pressure Level) to ensure a consistent perceived tonal balance at any volume.
+This repository provides a utility to generate Parametric EQ (PEQ) filters that compensate for the human ear's frequency response variation at different playback levels. The filters track the **ISO 226:2023 equal-loudness contours** relative to a reference level of 83 dB SPL (Sound Pressure Level) to ensure a consistent perceived tonal balance at any volume.
 
 It also includes a verification tool to check the accuracy of the generated filter cascades against the ideal ISO contours.
 
@@ -8,7 +8,7 @@ It also includes a verification tool to check the accuracy of the generated filt
 
 ## Introduction & Context
 
-The human ear does not perceive all frequencies equally. Crucially, our sensitivity to bass (low frequencies) and treble (high frequencies) drops significantly as the overall volume level decreases. This phenomenon is standardized in **ISO 226**.
+The human ear does not perceive all frequencies equally. Crucially, our sensitivity to bass (low frequencies) and treble (high frequencies) drops significantly as the overall volume level decreases. This phenomenon is standardized in **ISO 226:2023**.
 
 To maintain a natural and consistent tonal balance, audio playback systems ideally need dynamic loudness compensation—where EQ curves dynamically adjust based on the current volume level. However, achieving real-time feedback from a volume control or room SPL meter in playback ecosystems like **Roon** is technically challenging.
 
@@ -46,7 +46,7 @@ You can download and import these `.yml` files directly into Room EQ Wizard (REW
 
 ## How It Works
 
-1.  **Ideal Target Calculation**: Using standard ISO 226 coefficients, the ideal SPL curve is calculated for both the target playback level and the 83 dB reference level.
+1.  **Ideal Target Calculation**: Using standard ISO 226:2023 coefficients, the ideal SPL curve is calculated for both the target playback level and the 83 dB reference level.
 2.  **Optimization/Curve Fitting**: The target gains for the base filters in `loudness-filters.py` are optimized using `scipy.optimize.curve_fit` to closely match the ideal delta curve.
 3.  **Biquad Calculation**: Using Robert Bristow-Johnson's Audio EQ Cookbook formulas implemented in `get_biquad_coefs`, it designs digital biquad filter coefficients for low-shelf, high-shelf, and peak filters.
 4.  **Headroom Calculation**: Evaluates the combined response and computes the required negative headroom offset to keep peak gain below 0 dB.
@@ -115,18 +115,24 @@ Because equal-loudness filters apply positive gain at low and high frequencies, 
 
 ## The Math Behind It
 
-### ISO 226 Equal-Loudness Contour Formula
-The sound pressure level ($L_p$, in dB SPL) for a given phon level ($L_N$) at frequency $f$ is given by:
+### ISO 226:2023 Equal-Loudness Contour Formula
+The sound pressure level ($L_p$, in dB SPL) for a given phon level ($L_N$) at frequency $f$ per **ISO 226:2023** is given by:
 
-$$L_p = \frac{10.0}{\alpha_f} \log_{10}(A_f) - L_U + 94.0$$
+$$L_p = \frac{10.0}{\alpha_f} \log_{10}(A_f) - L_U$$
 
 where:
 
-$$A_f = 4.47 \times 10^{-3} \left(10^{0.025 L_N} - 1.15\right) + \left(0.4 \times 10^{\frac{T_f + L_U}{10} - 9.0}\right)^{\alpha_f}$$
+$$A_f = \left(4 \times 10^{-10}\right)^{0.3 - \alpha_f} \left(10^{0.03 L_N} - 10^{0.072}\right) + 10^{\frac{\alpha_f (T_f + L_U)}{10}}$$
 
-*   $\alpha_f$ (from standard coefficients) represents the exponent factor at frequency $f$.
-*   $L_U$ (from standard coefficients) represents the magnitude factor at frequency $f$.
-*   $T_f$ (from standard coefficients) represents the threshold of hearing at frequency $f$.
+*   $\alpha_f$ (from standard ISO 226:2023 coefficients) represents the exponent factor for loudness perception at frequency $f$.
+*   $L_U$ (from standard ISO 226:2023 coefficients) represents the linear transfer function magnitude factor at frequency $f$ (in dB).
+*   $T_f$ (from standard ISO 226:2023 coefficients) represents the threshold of hearing at frequency $f$ (in dB).
+
+#### Key Math Updates from ISO 226:2003
+1. **Loudness Growth Exponent ($\alpha_0$)**: Updated from $\alpha_0 = 0.25$ in ISO 226:2003 to $\alpha_0 = 0.30$ in ISO 226:2023, changing the phon level exponent term from $0.025 L_N$ to $0.03 L_N$.
+2. **Reference Threshold Constant**: Updated to $10^{0.072}$ (derived from $10^{0.03 \times 2.4\text{ dB}}$) instead of the $1.15$ approximation in the 2003 edition.
+3. **Reference Pressure Integration**: The term $(4 \times 10^{-10})^{0.3 - \alpha_f}$ directly integrates the reference sound pressure level ($20\,\mu\text{Pa}$), eliminating the separate $+94.0\text{ dB}$ normalization constant used in ISO 226:2003.
+4. **Coefficients Realignment**: The frequency-dependent exponents $\alpha_f$ were recalculated for the 0.30 power-law exponent, and hearing threshold values $T_f$ align with ISO 389-7:2019.
 
 ### Ideal Delta Target
 The ideal loudness compensation curve $\Delta_{\text{ideal}}(f)$ is the difference in loudness contour shape between the target level $L$ and the reference level $L_{\text{ref}} = 83.0\text{ dB}$, normalized to 0 dB at 1000 Hz:
