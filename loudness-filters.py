@@ -157,6 +157,40 @@ def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000):
     print(f"Saved frequency response plot to: {output_file}")
 
 
+def write_camilladsp_yaml(filters, level, headroom_offset=0.0):
+    """Writes PEQ filters to a CamillaDSP YAML file formatted for REW import."""
+    level_str = f"{int(level)}" if level.is_integer() else f"{level}"
+    filename = f"filter-{level_str}db.yml"
+
+    type_map = {
+        'Low Shelf': 'Lowshelf',
+        'High Shelf': 'Highshelf',
+        'Peak': 'Peaking',
+    }
+
+    lines = [
+        f"# Equal-Loudness Compensation EQ for {level} dB",
+        f"# Reference Level: {REF_LEVEL} dB, Headroom Adjustment: {headroom_offset:.2f} dB",
+        "",
+        "filters:"
+    ]
+
+    for i, (ftype, fc, gain, q_val) in enumerate(filters, 1):
+        band_name = f"band_{i}"
+        camilla_type = type_map.get(ftype, ftype)
+        lines.append(f"  {band_name}:")
+        lines.append("    type: Biquad")
+        lines.append("    parameters:")
+        lines.append(f"      type: {camilla_type}")
+        lines.append(f"      freq: {fc:.1f}")
+        lines.append(f"      gain: {gain:.2f}")
+        lines.append(f"      q: {q_val:.2f}")
+
+    with open(filename, 'w', encoding='utf-8') as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"Saved CamillaDSP YAML file to: {filename}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate Equal-Loudness PEQ Filters')
     parser.add_argument('--level', type=float, default=65.0,
@@ -166,4 +200,5 @@ if __name__ == "__main__":
     target_filters = calculate_filters_for_level(args.level)
     offset = calculate_headroom_offset(target_filters)
     write_markdown_table(target_filters, args.level, offset)
+    write_camilladsp_yaml(target_filters, args.level, offset)
     plot_frequency_response(target_filters, args.level, offset)

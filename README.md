@@ -27,6 +27,21 @@ Because equal-loudness compensation requires boosts in the low and high frequenc
 
 This project implements **Option 2**. The generator calculates the exact peak gain of the combined response and outputs the recommended negative preamp offset to ensure the entire filter curve remains at or below `0 dB`.
 
+### Pre-generated REW Filters (No Python Required)
+For users who do not have a Python environment or prefer not to run scripts, pre-generated CamillaDSP YAML filter files for common listening levels (55 dB through 95 dB in 5 dB steps) are available directly in the [REW](REW) directory:
+
+*   [filter-55db.yml](REW/filter-55db.yml) (55 dB SPL)
+*   [filter-60db.yml](REW/filter-60db.yml) (60 dB SPL)
+*   [filter-65db.yml](REW/filter-65db.yml) (65 dB SPL - Low / Quiet)
+*   [filter-70db.yml](REW/filter-70db.yml) (70 dB SPL)
+*   [filter-75db.yml](REW/filter-75db.yml) (75 dB SPL - Medium / Casual)
+*   [filter-80db.yml](REW/filter-80db.yml) (80 dB SPL)
+*   [filter-85db.yml](REW/filter-85db.yml) (85 dB SPL - High / Loud)
+*   [filter-90db.yml](REW/filter-90db.yml) (90 dB SPL)
+*   [filter-95db.yml](REW/filter-95db.yml) (95 dB SPL)
+
+You can download and import these `.yml` files directly into Room EQ Wizard (REW) without installing Python.
+
 ---
 
 ## How It Works
@@ -35,7 +50,7 @@ This project implements **Option 2**. The generator calculates the exact peak ga
 2.  **Optimization/Curve Fitting**: The target gains for the base filters in `loudness-filters.py` are optimized using `scipy.optimize.curve_fit` to closely match the ideal delta curve.
 3.  **Biquad Calculation**: Using Robert Bristow-Johnson's Audio EQ Cookbook formulas implemented in `get_biquad_coefs`, it designs digital biquad filter coefficients for low-shelf, high-shelf, and peak filters.
 4.  **Headroom Calculation**: Evaluates the combined response and computes the required negative headroom offset to keep peak gain below 0 dB.
-5.  **Visualization & Output Files**: Generates frequency response plots and outputs formatted Markdown tables containing exact PEQ filter specifications (`filter-xxdb.md`).
+5.  **Visualization & Output Files**: Generates frequency response plots, formatted Markdown tables (`filter-xxdb.md`), and CamillaDSP YAML filter files (`filter-xxdb.yml`) for direct REW import.
 
 ---
 
@@ -60,8 +75,9 @@ python loudness-filters.py --level <target_db>
 
 *   `--level` (float, default: `65.0`): The target average room sound pressure level (SPL) in dB.
 
-Running the script generates two files for the requested level:
+Running the script generates three files for the requested level:
 *   `filter-xxdb.md`: A Markdown table of the PEQ filters and recommended headroom adjustment.
+*   `filter-xxdb.yml`: Filter settings in CamillaDSP YAML format for direct REW import.
 *   `filter-xxdb.png`: Frequency response plot.
 
 ### 2. Verify Residual Error
@@ -75,16 +91,24 @@ python check.py --level <target_db>
 *   It calculates and outputs the maximum residual error to the terminal.
 *   It saves an error deviation plot as `iso_226_filter_error_for_xxdb.png`.
 
-### 3. Applying Filters in DSP Software & Hardware (Roon, REW, Equalizer APO, miniDSP)
+### 3. Importing Filters into Room EQ Wizard (REW) & DSP Systems
+
+#### Direct REW Import via CamillaDSP YAML
+Pre-generated YAML filter files for standard levels are available in the [REW](REW) directory, or you can generate custom `.yml` files using `loudness-filters.py`.
+
+1. Open **Room EQ Wizard (REW)** and pick **EQ** from the UI.
+2. Under the Equaliser tab on the right panel, select **CamillaDSP** as the **Manufacturer** and **Filters** as the **Model**.
+3. Under **Filter Tasks**, pick **Load filter settings from YAML file** (or select **File** > **Import filter settings** / **Open filters**) and choose your `filter-xxdb.yml` file (from the `REW/` directory or generated locally). REW will load all 10 filter bands (`LS Q`, `PK`, `HS Q`) into its active workspace.
+4. Once imported into REW, you can switch REW's **Equaliser** dropdown to any other target hardware model (e.g., *miniDSP*, *Generic*, etc.)—REW's conversion algorithms will automatically translate and rescale the frequency, gain, and Q boundaries to fit the destination device's limits.
+5. From REW, you can also select **File** > **Export** > **Export filters impulse response as WAV** to produce stereo WAV impulse response files for convolution engines (such as Roon Convolution or HQPlayer).
 
 #### Handling Headroom Adjustment & Preamp Reduction
 Because equal-loudness filters apply positive gain at low and high frequencies, a global negative preamp gain (headroom adjustment) is required to prevent digital clipping:
-*   Each generated Markdown table (`filter-xxdb.md`) documents the target playback level and required headroom adjustment (e.g., `-9.16 dB` for 65 dB).
+*   Each generated file documents the target playback level and required headroom adjustment (e.g., `-9.16 dB` for 65 dB).
 *   When using **Roon**, **REW**, **Equalizer APO**, or hardware DSPs (e.g., miniDSP), apply this negative preamp gain in your software/device headroom setting or input gain configuration to ensure peak response stays at or below 0 dB.
 
-#### Applying Filters in Roon or Hardware/Software DSPs
+#### Manual Entry for Other DSPs
 *   **Manual PEQ Entry**: Manually enter the filter parameters (frequency, gain, Q) from the generated Markdown tables (e.g. [filter-65db.md](filter-65db.md)) into your Parametric EQ processor (such as Roon's Parametric EQ or Equalizer APO), and set **Headroom Management** to the recommended negative gain offset.
-*   **Convolution Engine (WAV IR via REW)**: Manually enter the filter parameters into REW's EQ window, set the negative headroom adjustment, and then select **File** > **Export** > **Export filters impulse response as WAV** in REW. The generated WAV file can then be loaded directly into Roon's **Convolution** engine or other convolution plugins.
 
 ---
 
