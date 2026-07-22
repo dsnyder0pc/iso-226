@@ -159,6 +159,7 @@ Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](f
 
 *   **Reference Level**: 83.0 dB
 *   **Recommended Headroom Adjustment (Preamp Gain)**: `-9.45 dB`
+*   **Maximum Residual Error**: `0.2167 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
@@ -175,6 +176,10 @@ Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](f
 
 ![65 dB Frequency Response](images/filter-65db.png)
 
+The verification plot below shows the residual deviation error across standard preferred frequencies relative to the ideal ISO 226 contour:
+
+![65 dB Residual Error](images/iso_226_filter_error_for_65db.png)
+
 ---
 
 ### 2. Medium Level (75 dB)
@@ -182,6 +187,7 @@ Designed for casual, extended listening sessions. See the generated [filter-75db
 
 *   **Reference Level**: 83.0 dB
 *   **Recommended Headroom Adjustment (Preamp Gain)**: `-4.31 dB`
+*   **Maximum Residual Error**: `0.1836 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
@@ -198,6 +204,10 @@ Designed for casual, extended listening sessions. See the generated [filter-75db
 
 ![75 dB Frequency Response](images/filter-75db.png)
 
+The verification plot below shows the residual deviation error across standard preferred frequencies relative to the ideal ISO 226 contour:
+
+![75 dB Residual Error](images/iso_226_filter_error_for_75db.png)
+
 ---
 
 ### 3. High Level (85 dB)
@@ -205,6 +215,7 @@ Designed for active demo sessions. Since this level is above the 83 dB reference
 
 *   **Reference Level**: 83.0 dB
 *   **Recommended Headroom Adjustment (Preamp Gain)**: `-0.09 dB`
+*   **Maximum Residual Error**: `0.0494 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
@@ -219,6 +230,10 @@ Designed for active demo sessions. Since this level is above the 83 dB reference
 | 9 | High Shelf | 16000.0 | -0.86 | 0.71 |
 
 ![85 dB Frequency Response](images/filter-85db.png)
+
+The verification plot below shows the residual deviation error across standard preferred frequencies relative to the ideal ISO 226 contour:
+
+![85 dB Residual Error](images/iso_226_filter_error_for_85db.png)
 
 ---
 
