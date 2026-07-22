@@ -99,7 +99,9 @@ def main():
         color='#e377c2', linewidth=2
     )
     plt.axhline(0, color='black', linestyle='--', alpha=0.7)
-    plt.title(f'PEQ Filter Error Matrix Relative to Standard ISO 226 Contours ({level_str} dB)')
+    title_str = f'PEQ Filter Error Matrix Relative to Standard ISO 226 Contours ({level_str} dB)'
+    title_str += f'\n(Maximum Residual Error: {max_error:.4f} dB)'
+    plt.title(title_str)
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Deviation Error (dB)')
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
