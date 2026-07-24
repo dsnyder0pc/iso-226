@@ -49,6 +49,26 @@ def parse_markdown_filters(filepath):
     return filters
 
 
+def parse_markdown_reference_level(filepath):
+    """Parses the reference level from a generated Markdown table file if present.
+
+    Defaults to 83.0 if not found or file doesn't exist.
+    """
+    if not os.path.exists(filepath):
+        return 83.0
+    with open(filepath, 'r', encoding='utf-8') as file:
+        for line in file:
+            if "Reference Level:" in line:
+                try:
+                    parts = line.split("Reference Level:")
+                    if len(parts) > 1:
+                        ref_part = parts[1].split("dB")[0].strip()
+                        return float(ref_part)
+                except ValueError:
+                    pass
+    return 83.0
+
+
 def main():
     """Main execution function to parse arguments, run filter generation,
 
@@ -59,6 +79,8 @@ def main():
     )
     parser.add_argument('--level', type=float, default=65.0,
                         help='Target average playback level in dB (default: 65.0)')
+    parser.add_argument('--reference', type=float, default=None,
+                        help='Reference level for flat playback in dB (default: read from file, or 83.0)')
     args = parser.parse_args()
 
     # Determine filenames based on level
@@ -66,18 +88,37 @@ def main():
     md_filename = f"filter-{level_str}db.md"
     plot_filename = f"iso_226_filter_error_for_{level_str}db.png"
 
-    # Make system call to generate the filter file if it doesn't exist
-    if not os.path.exists(md_filename):
-        print(f"File '{md_filename}' not found. Generating filters using loudness-filters.py...")
+    # Read reference level from file if it exists and wasn't explicitly provided,
+    # otherwise default to 83.0
+    file_ref_level = None
+    if os.path.exists(md_filename):
+        file_ref_level = parse_markdown_reference_level(md_filename)
+
+    ref_level = args.reference
+    if ref_level is None:
+        ref_level = file_ref_level if file_ref_level is not None else 83.0
+
+    # Regenerate if file doesn't exist or reference level doesn't match
+    need_regeneration = not os.path.exists(md_filename)
+    if not need_regeneration and args.reference is not None and file_ref_level != args.reference:
+        print(f"Existing file '{md_filename}' has reference level {file_ref_level} dB, but {args.reference} dB was requested. Regenerating...")
+        need_regeneration = True
+
+    if need_regeneration:
+        print(f"Generating filters using loudness-filters.py...")
         script_dir = os.path.dirname(os.path.abspath(__file__))
         filters_script = os.path.join(script_dir, 'loudness-filters.py')
-        subprocess.run([sys.executable, filters_script, '--level', str(args.level)], check=True)
+        subprocess.run([
+            sys.executable, filters_script,
+            '--level', str(args.level),
+            '--reference', str(ref_level)
+        ], check=True)
 
     # Read the PEQ filters from the Markdown table file
     filters = parse_markdown_filters(md_filename)
 
     # Calculate Ideal Target
-    ref_spl = iso226_spl(83.0)
+    ref_spl = iso226_spl(ref_level)
     target_spl = iso226_spl(args.level)
 
     # Delta curve normalized at 1000 Hz (index 17 in standard preferred frequencies)
@@ -99,7 +140,8 @@ def main():
         color='#e377c2', linewidth=2
     )
     plt.axhline(0, color='black', linestyle='--', alpha=0.7)
-    title_str = f'PEQ Filter Error Matrix Relative to Standard ISO 226 Contours ({level_str} dB)'
+    ref_str = f"{int(ref_level)}" if ref_level.is_integer() else f"{ref_level}"
+    title_str = f'PEQ Filter Error Matrix Relative to Standard ISO 226 Contours\n({level_str} dB referenced to {ref_str} dB)'
     title_str += f'\n(Maximum Residual Error: {max_error:.4f} dB)'
     plt.title(title_str)
     plt.xlabel('Frequency (Hz)')

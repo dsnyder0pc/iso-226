@@ -123,8 +123,10 @@ def write_markdown_table(filters, level, headroom_offset=0.0):
 
 
 
-def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000):
+def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000, ref_level=None):
     """Plots the combined frequency response of the PEQ filters and saves to PNG."""
+    if ref_level is None:
+        ref_level = REF_LEVEL
     frequencies = np.logspace(np.log10(20), np.log10(20000), 1000)
 
     # Convert magnitude to dB and apply headroom offset
@@ -134,7 +136,9 @@ def plot_frequency_response(filters, level, headroom_offset=0.0, fs=48000):
     plt.figure(figsize=(12, 6))
     plt.semilogx(frequencies, response_db, color='#1f77b4', linewidth=2, label='Compensated Response')
 
-    title_str = f'Equal-Loudness PEQ Compensation ({level} dB Average Playback)'
+    level_str = f"{int(level)}" if level.is_integer() else f"{level}"
+    ref_str = f"{int(ref_level)}" if ref_level.is_integer() else f"{ref_level}"
+    title_str = f'Equal-Loudness PEQ Compensation ({level_str} dB referenced to {ref_str} dB)'
     if headroom_offset != 0.0:
         title_str += f'\n(Headroom Adjustment: {headroom_offset:.2f} dB)'
     plt.title(title_str)
@@ -218,10 +222,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate Equal-Loudness PEQ Filters')
     parser.add_argument('--level', type=float, default=65.0,
                         help='Target average playback level in dB (default: 65.0)')
+    parser.add_argument('--reference', type=float, default=83.0,
+                        help='Reference level for flat playback in dB (default: 83.0)')
     args = parser.parse_args()
+
+    REF_LEVEL = args.reference
 
     target_filters = calculate_filters_for_level(args.level)
     offset = calculate_headroom_offset(target_filters)
     write_markdown_table(target_filters, args.level, offset)
     write_camilladsp_yaml(target_filters, args.level, offset)
-    plot_frequency_response(target_filters, args.level, offset)
+    plot_frequency_response(target_filters, args.level, offset, ref_level=REF_LEVEL)

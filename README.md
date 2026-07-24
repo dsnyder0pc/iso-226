@@ -67,13 +67,20 @@ pip install -r requirements.txt
 ## Usage
 
 ### 1. Generate Custom PEQ Filters
-Run the generator script by specifying your target average listening level in dB:
+Run the generator script by specifying your target average listening level in dB and (optionally) a custom reference level:
 
 ```bash
-python loudness-filters.py --level <target_db>
+python loudness-filters.py --level <target_db> [--reference <reference_db>]
 ```
 
 *   `--level` (float, default: `65.0`): The target average room sound pressure level (SPL) in dB.
+*   `--reference` (float, default: `83.0`): The reference sound pressure level (SPL) in dB representing a flat playback response.
+
+> [!TIP]
+> **Why customize the reference level (`--reference`)?**
+> The default reference level of `83.0` dB SPL represents the standard flat playback level used for mastering most mainstream pop, rock, and jazz recordings.
+>
+> However, some specialized recordings are mastered/voiced for a lower baseline listening level. A prime example is the *[Scripture Lullabies](https://scripture-lullabies.com/pages/stream)* series, which is specifically designed for quiet bedtime or sleep environments. Since these albums are mixed to sound tonally balanced at a much lower level (such as `72.0` dB), setting `--reference 72` ensures that the compensation filters are calculated relative to this lower intended playback level, preventing over-boosting of the bass and treble.
 
 Running the script generates three files for the requested level:
 *   `filter-xxdb.md`: A Markdown table of the PEQ filters and recommended headroom adjustment.
@@ -84,9 +91,10 @@ Running the script generates three files for the requested level:
 Run the verification script to check the deviation of the PEQ filters against the ideal contours:
 
 ```bash
-python check.py --level <target_db>
+python check.py --level <target_db> [--reference <reference_db>]
 ```
 
+*   `--reference` (float, default: parsed from the generated markdown file, or `83.0`): The reference level in dB to verify against. If specified, and the existing `filter-xxdb.md` file contains a different reference level, the script will automatically regenerate the filters with the new reference level.
 *   If the corresponding `filter-xxdb.md` does not exist, the script automatically invokes `loudness-filters.py` to generate it.
 *   It calculates and outputs the maximum residual error to the terminal.
 *   It saves an error deviation plot as `iso_226_filter_error_for_xxdb.png`.
