@@ -69,6 +69,72 @@ def parse_markdown_reference_level(filepath):
     return 83.0
 
 
+def ensure_filter_file(level, md_filename, requested_reference):
+    """Ensures the filter Markdown file exists and matches the requested reference level.
+
+    Returns the actual reference level of the file.
+    """
+    file_ref_level = None
+    if os.path.exists(md_filename):
+        file_ref_level = parse_markdown_reference_level(md_filename)
+
+    ref_level = requested_reference
+    if ref_level is None:
+        ref_level = file_ref_level if file_ref_level is not None else 83.0
+
+    # Regenerate if file doesn't exist or reference level doesn't match
+    need_regeneration = not os.path.exists(md_filename)
+    if (not need_regeneration and requested_reference is not None
+            and file_ref_level != requested_reference):
+        print(
+            f"Existing file '{md_filename}' has reference level "
+            f"{file_ref_level} dB, but {requested_reference} dB was requested. "
+            "Regenerating..."
+        )
+        need_regeneration = True
+
+    if need_regeneration:
+        print("Generating filters using loudness-filters.py...")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        filters_script = os.path.join(script_dir, 'loudness-filters.py')
+        subprocess.run([
+            sys.executable, filters_script,
+            '--level', str(level),
+            '--reference', str(ref_level)
+        ], check=True)
+    return ref_level
+
+
+def plot_residual_error(error, level, ref_level, max_error, plot_filename):
+    """Plots the residual error of the filters and saves to PNG."""
+    level_str = f"{int(level)}" if level.is_integer() else f"{level}"
+    ref_str = f"{int(ref_level)}" if ref_level.is_integer() else f"{ref_level}"
+
+    plt.figure(figsize=(12, 6))
+    plt.semilogx(
+        ISO_FREQ, error, 'o-',
+        label=f'{level_str} dB Target Residual Error',
+        color='#e377c2', linewidth=2
+    )
+    plt.axhline(0, color='black', linestyle='--', alpha=0.7)
+    title_str = (
+        'PEQ Filter Error Matrix Relative to Standard ISO 226 Contours\n'
+        f'({level_str} dB referenced to {ref_str} dB)'
+    )
+    title_str += f'\n(Maximum Residual Error: {max_error:.4f} dB)'
+    plt.title(title_str)
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Deviation Error (dB)')
+    plt.grid(True, which='both', linestyle='--', alpha=0.5)
+    plt.xlim([20, 12500])
+    plt.ylim([-2.0, 2.0])
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(plot_filename, dpi=150)
+    plt.close()
+    print(f"Verification complete. Error plot saved as '{plot_filename}'.")
+
+
 def main():
     """Main execution function to parse arguments, run filter generation,
 
@@ -88,31 +154,8 @@ def main():
     md_filename = f"filter-{level_str}db.md"
     plot_filename = f"iso_226_filter_error_for_{level_str}db.png"
 
-    # Read reference level from file if it exists and wasn't explicitly provided,
-    # otherwise default to 83.0
-    file_ref_level = None
-    if os.path.exists(md_filename):
-        file_ref_level = parse_markdown_reference_level(md_filename)
-
-    ref_level = args.reference
-    if ref_level is None:
-        ref_level = file_ref_level if file_ref_level is not None else 83.0
-
-    # Regenerate if file doesn't exist or reference level doesn't match
-    need_regeneration = not os.path.exists(md_filename)
-    if not need_regeneration and args.reference is not None and file_ref_level != args.reference:
-        print(f"Existing file '{md_filename}' has reference level {file_ref_level} dB, but {args.reference} dB was requested. Regenerating...")
-        need_regeneration = True
-
-    if need_regeneration:
-        print(f"Generating filters using loudness-filters.py...")
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        filters_script = os.path.join(script_dir, 'loudness-filters.py')
-        subprocess.run([
-            sys.executable, filters_script,
-            '--level', str(args.level),
-            '--reference', str(ref_level)
-        ], check=True)
+    # Ensure filter file exists and matches reference level
+    ref_level = ensure_filter_file(args.level, md_filename, args.reference)
 
     # Read the PEQ filters from the Markdown table file
     filters = parse_markdown_filters(md_filename)
@@ -132,28 +175,8 @@ def main():
     max_error = np.max(np.abs(error))
     print(f"Max residual error: {max_error:.4f} dB")
 
-    # Plot generation
-    plt.figure(figsize=(12, 6))
-    plt.semilogx(
-        ISO_FREQ, error, 'o-',
-        label=f'{level_str} dB Target Residual Error',
-        color='#e377c2', linewidth=2
-    )
-    plt.axhline(0, color='black', linestyle='--', alpha=0.7)
-    ref_str = f"{int(ref_level)}" if ref_level.is_integer() else f"{ref_level}"
-    title_str = f'PEQ Filter Error Matrix Relative to Standard ISO 226 Contours\n({level_str} dB referenced to {ref_str} dB)'
-    title_str += f'\n(Maximum Residual Error: {max_error:.4f} dB)'
-    plt.title(title_str)
-    plt.xlabel('Frequency (Hz)')
-    plt.ylabel('Deviation Error (dB)')
-    plt.grid(True, which='both', linestyle='--', alpha=0.5)
-    plt.xlim([20, 12500])
-    plt.ylim([-2.0, 2.0])
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(plot_filename, dpi=150)
-    plt.close()
-    print(f"Verification complete. Error plot saved as '{plot_filename}'.")
+    # Generate and save the verification error plot
+    plot_residual_error(error, args.level, ref_level, max_error, plot_filename)
 
 
 if __name__ == "__main__":

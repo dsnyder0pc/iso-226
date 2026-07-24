@@ -52,13 +52,25 @@ def _optimize_filter_params(ideal_delta):
     popt_gains, _ = curve_fit(fit_gains, ISO_FREQ, ideal_delta, p0=initial_guess)
 
     def loss_inf(params):
-        filters = [(BASE_FILTERS[i][0], max(15.0, params[10 + i]), params[i], max(0.2, params[20 + i]))
+        filters = [(BASE_FILTERS[i][0], params[10 + i], params[i], params[20 + i])
                    for i in range(10)]
         resp = get_filter_response(filters, ISO_FREQ)
         return np.max(np.abs(resp - ideal_delta))
 
     p0 = list(popt_gains) + [f[1] for f in BASE_FILTERS] + [f[3] for f in BASE_FILTERS]
-    bounds = [(-30.0, 30.0)] * 10 + [(15.0, 20000.0)] * 10 + [(0.2, 5.0)] * 10
+
+    bounds = []
+    # Gains: -30.0 to 30.0 dB
+    for _ in range(10):
+        bounds.append((-30.0, 30.0))
+    # Frequencies: +/- 30% of base frequencies
+    for f in BASE_FILTERS:
+        base_f = f[1]
+        bounds.append((base_f * 0.70, base_f * 1.30))
+    # Q-values: 0.3 to 3.0
+    for _ in range(10):
+        bounds.append((0.3, 3.0))
+
     res = minimize(loss_inf, p0, method='SLSQP', bounds=bounds, options={'maxiter': 500})
     return res.x[:10], res.x[10:20], res.x[20:30]
 
