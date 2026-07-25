@@ -166,21 +166,21 @@ Below are the pre-generated PEQ tables and frequency responses for the three pri
 Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](filter-65db.md) for details.
 
 *   **Reference Level**: 83.0 dB
-*   **Recommended Headroom Adjustment (Preamp Gain)**: `-9.45 dB`
-*   **Maximum Residual Error**: `0.2167 dB`
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `-9.32 dB`
+*   **Maximum Residual Error**: `0.1660 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 35.0 | 1.89 | 0.81 |
-| 2 | Low Shelf | 75.1 | 7.64 | 0.56 |
-| 3 | Peak | 150.0 | 3.26 | 0.45 |
-| 4 | Peak | 300.0 | -0.37 | 1.13 |
-| 5 | Peak | 600.0 | 0.33 | 1.44 |
-| 6 | Peak | 1000.0 | -0.62 | 0.93 |
-| 7 | Peak | 3000.0 | -0.61 | 1.39 |
-| 8 | Peak | 6000.0 | -1.07 | 0.98 |
-| 9 | High Shelf | 10000.0 | 3.40 | 0.74 |
-| 10 | High Shelf | 16000.0 | 4.16 | 0.74 |
+| 1 | Low Shelf | 34.8 | 1.27 | 0.86 |
+| 2 | Low Shelf | 75.0 | 8.18 | 0.52 |
+| 3 | Peak | 150.1 | 2.90 | 0.44 |
+| 4 | Peak | 300.4 | -0.18 | 1.10 |
+| 5 | Peak | 599.9 | 0.32 | 1.20 |
+| 6 | Peak | 1000.0 | -0.54 | 0.62 |
+| 7 | Peak | 3000.0 | -0.38 | 0.50 |
+| 8 | Peak | 6000.0 | -0.36 | 0.52 |
+| 9 | High Shelf | 10000.0 | 3.04 | 0.95 |
+| 10 | High Shelf | 16000.0 | 4.42 | 0.74 |
 
 ![65 dB Frequency Response](images/filter-65db.png)
 
@@ -194,21 +194,21 @@ The verification plot below shows the residual deviation error across standard p
 Designed for casual, extended listening sessions. See the generated [filter-75db.md](filter-75db.md) for details.
 
 *   **Reference Level**: 83.0 dB
-*   **Recommended Headroom Adjustment (Preamp Gain)**: `-4.31 dB`
-*   **Maximum Residual Error**: `0.1836 dB`
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `-4.33 dB`
+*   **Maximum Residual Error**: `0.0984 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 35.0 | 0.74 | 0.69 |
-| 2 | Low Shelf | 75.0 | 3.28 | 0.71 |
-| 3 | Peak | 150.0 | 1.78 | 0.67 |
-| 4 | Peak | 300.0 | 0.02 | 1.00 |
-| 5 | Peak | 600.0 | 0.20 | 1.40 |
-| 6 | Peak | 1000.0 | -0.32 | 1.00 |
-| 7 | Peak | 3000.0 | -0.33 | 1.40 |
-| 8 | Peak | 6000.0 | -0.48 | 1.00 |
-| 9 | High Shelf | 10000.0 | 1.51 | 0.71 |
-| 10 | High Shelf | 16000.0 | 2.70 | 0.71 |
+| 1 | Low Shelf | 35.0 | 0.80 | 0.77 |
+| 2 | Low Shelf | 75.1 | 3.30 | 0.61 |
+| 3 | Peak | 150.0 | 1.56 | 0.52 |
+| 4 | Peak | 300.0 | -0.17 | 1.06 |
+| 5 | Peak | 600.0 | 0.22 | 1.40 |
+| 6 | Peak | 1000.0 | -0.33 | 0.88 |
+| 7 | Peak | 3000.0 | -0.34 | 1.30 |
+| 8 | Peak | 6000.0 | -0.46 | 1.00 |
+| 9 | High Shelf | 10000.0 | 1.55 | 0.72 |
+| 10 | High Shelf | 16000.0 | 2.65 | 0.73 |
 
 ![75 dB Frequency Response](images/filter-75db.png)
 
