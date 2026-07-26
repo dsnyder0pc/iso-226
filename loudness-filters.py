@@ -10,7 +10,6 @@ table file, and plots the combined frequency response to a PNG file.
 # pylint: disable=invalid-name
 
 import argparse
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit, minimize
@@ -221,13 +220,6 @@ def write_camilladsp_yaml(filters, level, headroom_offset=0.0):
     with open(filename, 'w', encoding='utf-8') as f_out:
         f_out.write(yaml_content)
     print(f"Saved CamillaDSP YAML file to: {filename}")
-
-    rew_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'REW')
-    if os.path.exists(rew_dir):
-        rew_path = os.path.join(rew_dir, filename)
-        with open(rew_path, 'w', encoding='utf-8') as f_out:
-            f_out.write(yaml_content)
-        print(f"Saved CamillaDSP YAML file to: {rew_path}")
 
 
 if __name__ == "__main__":
