@@ -5,7 +5,9 @@ ISO 226 equal-loudness contours and biquad filter calculation helper.
 import numpy as np
 from scipy.signal import freqz
 
-# ISO 226:2023 Standard Coefficients for Preferred Frequencies
+# ISO 226 Standard Coefficients for Preferred Frequencies
+# Per-frequency alpha_f, L_U, and T_f values from ISO 226:2003 Table 1.
+# T_f at 20 Hz updated to 78.1 dB per ISO 226:2023 (aligned with ISO 389-7:2019).
 ISO_FREQ = np.array([
     20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0, 200.0,
     250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0, 1600.0,
@@ -13,9 +15,9 @@ ISO_FREQ = np.array([
 ])
 
 ISO_AF = np.array([
-    0.635, 0.602, 0.569, 0.537, 0.509, 0.482, 0.456, 0.433, 0.412, 0.391,
-    0.373, 0.357, 0.343, 0.330, 0.320, 0.311, 0.303, 0.300, 0.295, 0.292,
-    0.290, 0.290, 0.289, 0.289, 0.289, 0.293, 0.303, 0.323, 0.354
+    0.532, 0.506, 0.480, 0.455, 0.432, 0.409, 0.387, 0.367, 0.349, 0.330,
+    0.315, 0.301, 0.288, 0.276, 0.267, 0.259, 0.253, 0.250, 0.246, 0.244,
+    0.243, 0.243, 0.243, 0.242, 0.242, 0.245, 0.254, 0.271, 0.301
 ])
 
 ISO_LU = np.array([
@@ -32,10 +34,13 @@ ISO_TF = np.array([
 
 
 def iso226_spl(phon, f_arr=None):
-    """Calculates Sound Pressure Level (dB SPL) for a given phon level per ISO 226:2023.
+    """Calculates Sound Pressure Level (dB SPL) for a given phon level per ISO 226.
+
+    Uses the standard formula from ISO 226:2003 with the updated hearing
+    threshold at 20 Hz from ISO 226:2023 (aligned with ISO 389-7:2019).
 
     Args:
-        phon (float): Phon level.
+        phon (float): Phon level (valid range: 0 to 90).
         f_arr (np.ndarray): Frequencies to calculate for. Defaults to ISO_FREQ.
 
     Returns:
@@ -47,9 +52,10 @@ def iso226_spl(phon, f_arr=None):
     lu = np.interp(f_arr, ISO_FREQ, ISO_LU)
     tf = np.interp(f_arr, ISO_FREQ, ISO_TF)
 
-    # Official ISO 226:2023 standard formula
-    a_f = (4e-10)**(0.3 - af) * (10**(0.03 * phon) - 10**0.072) + 10**(af * (tf + lu) / 10.0)
-    l_p = (10.0 / af) * np.log10(a_f) - lu
+    # ISO 226:2003 standard formula (Section 4.1)
+    a_f = 4.47e-3 * (10 ** (0.025 * phon) - 1.15) \
+        + (0.4 * 10 ** (((tf + lu) / 10.0) - 9.0)) ** af
+    l_p = (10.0 / af) * np.log10(a_f) - lu + 94.0
     return l_p
 
 

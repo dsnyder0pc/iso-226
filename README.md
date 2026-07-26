@@ -1,6 +1,6 @@
 # ISO 226 Equal-Loudness Compensation PEQ Generator
 
-This repository provides a utility to generate Parametric EQ (PEQ) filters that compensate for the human ear's frequency response variation at different playback levels. The filters track the **ISO 226:2023 equal-loudness contours** relative to a reference level of 83 dB SPL (Sound Pressure Level) to ensure a consistent perceived tonal balance at any volume.
+This repository provides a utility to generate Parametric EQ (PEQ) filters that compensate for the human ear's frequency response variation at different playback levels. The filters track the **ISO 226 equal-loudness contours** relative to a reference level of 83 dB SPL (Sound Pressure Level) to ensure a consistent perceived tonal balance at any volume.
 
 It also includes a verification tool to check the accuracy of the generated filter cascades against the ideal ISO contours.
 
@@ -8,7 +8,7 @@ It also includes a verification tool to check the accuracy of the generated filt
 
 ## Introduction & Context
 
-The human ear does not perceive all frequencies equally. Crucially, our sensitivity to bass (low frequencies) and treble (high frequencies) drops significantly as the overall volume level decreases. This phenomenon is standardized in **ISO 226:2023**.
+The human ear does not perceive all frequencies equally. Crucially, our sensitivity to bass (low frequencies) and treble (high frequencies) drops significantly as the overall volume level decreases. This phenomenon is standardized in **ISO 226** (originally published in 2003, with a minor revision in 2023).
 
 To maintain a natural and consistent tonal balance, audio playback systems ideally need dynamic loudness compensation—where EQ curves dynamically adjust based on the current volume level. However, achieving real-time feedback from a volume control or room SPL meter in playback ecosystems like **Roon** is technically challenging.
 
@@ -46,7 +46,7 @@ You can download and import these `.yml` files directly into Room EQ Wizard (REW
 
 ## How It Works
 
-1.  **Ideal Target Calculation**: Using standard ISO 226:2023 coefficients, the ideal SPL curve is calculated for both the target playback level and the 83 dB reference level.
+1.  **Ideal Target Calculation**: Using standard ISO 226 coefficients (ISO 226:2003 Table 1, with the updated 20 Hz hearing threshold from ISO 226:2023), the ideal SPL curve is calculated for both the target playback level and the 83 dB reference level.
 2.  **Optimization/Curve Fitting**: The target gains for the base filters in `loudness-filters.py` are optimized using `scipy.optimize.curve_fit` to closely match the ideal delta curve.
 3.  **Biquad Calculation**: Using Robert Bristow-Johnson's Audio EQ Cookbook formulas implemented in `get_biquad_coefs`, it designs digital biquad filter coefficients for low-shelf, high-shelf, and peak filters.
 4.  **Headroom Calculation**: Evaluates the combined response and computes the required negative headroom offset to keep peak gain below 0 dB.
@@ -123,24 +123,23 @@ Because equal-loudness filters apply positive gain at low and high frequencies, 
 
 ## The Math Behind It
 
-### ISO 226:2023 Equal-Loudness Contour Formula
-The sound pressure level ($L_p$, in dB SPL) for a given phon level ($L_N$) at frequency $f$ per **ISO 226:2023** is given by:
+### ISO 226 Equal-Loudness Contour Formula
+The sound pressure level ($L_p$, in dB SPL) for a given phon level ($L_N$) at frequency $f$ per **ISO 226:2003** (Section 4.1) is given by:
 
-$$L_p = \frac{10.0}{\alpha_f} \log_{10}(A_f) - L_U$$
+$$L_p = \frac{10}{\alpha_f} \log_{10}(A_f) - L_U + 94$$
 
 where:
 
-$$A_f = \left(4 \times 10^{-10}\right)^{0.3 - \alpha_f} \left(10^{0.03 L_N} - 10^{0.072}\right) + 10^{\frac{\alpha_f (T_f + L_U)}{10}}$$
+$$A_f = 4.47 \times 10^{-3} \left(10^{0.025 L_N} - 1.15\right) + \left(0.4 \times 10^{\frac{T_f + L_U}{10} - 9}\right)^{\alpha_f}$$
 
-*   $\alpha_f$ (from standard ISO 226:2023 coefficients) represents the exponent factor for loudness perception at frequency $f$.
-*   $L_U$ (from standard ISO 226:2023 coefficients) represents the linear transfer function magnitude factor at frequency $f$ (in dB).
-*   $T_f$ (from standard ISO 226:2023 coefficients) represents the threshold of hearing at frequency $f$ (in dB).
+*   $\alpha_f$ is the exponent of loudness perception at frequency $f$ (from ISO 226:2003 Table 1).
+*   $L_U$ is the magnitude of the linear transfer function normalized at 1000 Hz (in dB, from ISO 226:2003 Table 1).
+*   $T_f$ is the threshold of hearing at frequency $f$ (in dB, from ISO 226:2003 Table 1; $T_f$ at 20 Hz updated to 78.1 dB per ISO 226:2023 to align with ISO 389-7:2019).
+*   The constant $4.47 \times 10^{-3}$ relates to the reference sound pressure ($20\,\mu\text{Pa}$) and the loudness growth exponent ($\alpha_0 = 0.025$).
+*   The $+94$ dB constant normalizes the result relative to the reference sound pressure level ($20\,\mu\text{Pa} \Rightarrow 20 \log_{10}(1 / 20 \times 10^{-6}) = 94$ dB).
 
-#### Key Math Updates from ISO 226:2003
-1. **Loudness Growth Exponent ($\alpha_0$)**: Updated from $\alpha_0 = 0.25$ in ISO 226:2003 to $\alpha_0 = 0.30$ in ISO 226:2023, changing the phon level exponent term from $0.025 L_N$ to $0.03 L_N$.
-2. **Reference Threshold Constant**: Updated to $10^{0.072}$ (derived from $10^{0.03 \times 2.4\text{ dB}}$) instead of the $1.15$ approximation in the 2003 edition.
-3. **Reference Pressure Integration**: The term $(4 \times 10^{-10})^{0.3 - \alpha_f}$ directly integrates the reference sound pressure level ($20\,\mu\text{Pa}$), eliminating the separate $+94.0\text{ dB}$ normalization constant used in ISO 226:2003.
-4. **Coefficients Realignment**: The frequency-dependent exponents $\alpha_f$ were recalculated for the 0.30 power-law exponent, and hearing threshold values $T_f$ align with ISO 389-7:2019.
+#### Note on ISO 226:2023
+ISO 226:2023 is the current edition of this standard. The only substantive data change is the hearing threshold at 20 Hz, lowered from 78.5 dB to 78.1 dB to align with ISO 389-7:2019. All other coefficient values ($\alpha_f$, $L_U$, $T_f$) remain identical to ISO 226:2003. The 2023 edition also refined the mathematical expressions for improved precision of significant digits, but the resulting contours differ by at most 0.6 dB from the 2003 edition.
 
 ### Ideal Delta Target
 The ideal loudness compensation curve $\Delta_{\text{ideal}}(f)$ is the difference in loudness contour shape between the target level $L$ and the reference level $L_{\text{ref}} = 83.0\text{ dB}$, normalized to 0 dB at 1000 Hz:
@@ -166,21 +165,21 @@ Below are the pre-generated PEQ tables and frequency responses for the three pri
 Designed for quiet, non-intrusive playback. See the generated [filter-65db.md](filter-65db.md) for details.
 
 *   **Reference Level**: 83.0 dB
-*   **Recommended Headroom Adjustment (Preamp Gain)**: `-9.32 dB`
-*   **Maximum Residual Error**: `0.1660 dB`
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `-9.37 dB`
+*   **Maximum Residual Error**: `0.1185 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 34.8 | 1.27 | 0.86 |
-| 2 | Low Shelf | 75.0 | 8.18 | 0.52 |
-| 3 | Peak | 150.1 | 2.90 | 0.44 |
-| 4 | Peak | 300.4 | -0.18 | 1.10 |
-| 5 | Peak | 599.9 | 0.32 | 1.20 |
-| 6 | Peak | 1000.0 | -0.54 | 0.62 |
-| 7 | Peak | 3000.0 | -0.38 | 0.50 |
-| 8 | Peak | 6000.0 | -0.36 | 0.52 |
-| 9 | High Shelf | 10000.0 | 3.04 | 0.95 |
-| 10 | High Shelf | 16000.0 | 4.42 | 0.74 |
+| 1 | Low Shelf | 34.7 | 2.06 | 0.63 |
+| 2 | Low Shelf | 75.0 | 7.61 | 0.50 |
+| 3 | Peak | 150.0 | 2.86 | 0.38 |
+| 4 | Peak | 300.0 | -0.42 | 1.13 |
+| 5 | Peak | 600.0 | -0.06 | 2.13 |
+| 6 | Peak | 1000.0 | -0.50 | 0.72 |
+| 7 | Peak | 3000.0 | -0.01 | 1.17 |
+| 8 | Peak | 6000.0 | -1.03 | 0.33 |
+| 9 | High Shelf | 10000.0 | 3.29 | 0.80 |
+| 10 | High Shelf | 16000.0 | 5.56 | 0.55 |
 
 ![65 dB Frequency Response](images/filter-65db.png)
 
@@ -194,21 +193,21 @@ The verification plot below shows the residual deviation error across standard p
 Designed for casual, extended listening sessions. See the generated [filter-75db.md](filter-75db.md) for details.
 
 *   **Reference Level**: 83.0 dB
-*   **Recommended Headroom Adjustment (Preamp Gain)**: `-4.33 dB`
-*   **Maximum Residual Error**: `0.0984 dB`
+*   **Recommended Headroom Adjustment (Preamp Gain)**: `-4.81 dB`
+*   **Maximum Residual Error**: `0.1162 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 35.0 | 0.80 | 0.77 |
-| 2 | Low Shelf | 75.1 | 3.30 | 0.61 |
-| 3 | Peak | 150.0 | 1.56 | 0.52 |
-| 4 | Peak | 300.0 | -0.17 | 1.06 |
-| 5 | Peak | 600.0 | 0.22 | 1.40 |
-| 6 | Peak | 1000.0 | -0.33 | 0.88 |
-| 7 | Peak | 3000.0 | -0.34 | 1.30 |
-| 8 | Peak | 6000.0 | -0.46 | 1.00 |
-| 9 | High Shelf | 10000.0 | 1.55 | 0.72 |
-| 10 | High Shelf | 16000.0 | 2.65 | 0.73 |
+| 1 | Low Shelf | 35.0 | 0.81 | 0.67 |
+| 2 | Low Shelf | 75.0 | 3.28 | 0.64 |
+| 3 | Peak | 150.0 | 1.62 | 0.54 |
+| 4 | Peak | 300.0 | -0.09 | 1.08 |
+| 5 | Peak | 600.0 | 0.16 | 1.40 |
+| 6 | Peak | 1000.0 | -0.35 | 0.99 |
+| 7 | Peak | 3000.0 | -0.30 | 1.39 |
+| 8 | Peak | 6000.0 | -0.52 | 0.99 |
+| 9 | High Shelf | 10000.0 | 1.65 | 0.74 |
+| 10 | High Shelf | 16000.0 | 3.02 | 0.72 |
 
 ![75 dB Frequency Response](images/filter-75db.png)
 
@@ -223,19 +222,20 @@ Designed for active demo sessions. Since this level is above the 83 dB reference
 
 *   **Reference Level**: 83.0 dB
 *   **Recommended Headroom Adjustment (Preamp Gain)**: `-0.09 dB`
-*   **Maximum Residual Error**: `0.0494 dB`
+*   **Maximum Residual Error**: `0.0324 dB`
 
 | Band | Type | Center Frequency (Hz) | Amplitude (dB) | Q-Value |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 35.0 | -0.19 | 0.71 |
-| 2 | Low Shelf | 75.0 | -0.81 | 0.71 |
-| 3 | Peak | 150.0 | -0.44 | 0.69 |
-| 4 | Peak | 600.0 | -0.05 | 1.40 |
-| 5 | Peak | 1000.0 | 0.09 | 1.00 |
-| 6 | Peak | 3000.0 | 0.09 | 1.40 |
-| 7 | Peak | 6000.0 | 0.12 | 1.00 |
-| 8 | High Shelf | 10000.0 | -0.36 | 0.71 |
-| 9 | High Shelf | 16000.0 | -0.86 | 0.71 |
+| 1 | Low Shelf | 35.1 | -0.19 | 0.55 |
+| 2 | Low Shelf | 75.0 | -0.87 | 0.50 |
+| 3 | Peak | 150.0 | -0.32 | 0.52 |
+| 4 | Peak | 300.0 | 0.05 | 1.00 |
+| 5 | Peak | 600.0 | -0.03 | 1.40 |
+| 6 | Peak | 1000.0 | 0.10 | 1.00 |
+| 7 | Peak | 3000.0 | 0.09 | 1.40 |
+| 8 | Peak | 6000.0 | 0.13 | 1.00 |
+| 9 | High Shelf | 10000.0 | -0.40 | 0.71 |
+| 10 | High Shelf | 16000.0 | -1.00 | 0.71 |
 
 ![85 dB Frequency Response](images/filter-85db.png)
 
@@ -247,7 +247,7 @@ The verification plot below shows the residual deviation error across standard p
 
 ## References
 
-*   **ISO 226:2023 Standard**: *Acoustics — Normal equal-loudness-level contours* (replaces ISO 226:2003). International Organization for Standardization. [ISO 226 Specification](https://www.iso.org/standard/83117.html).
+*   **ISO 226:2003 Standard**: *Acoustics — Normal equal-loudness-level contours*. International Organization for Standardization. [ISO 226:2003 Specification](https://www.iso.org/standard/34222.html). (Third edition, ISO 226:2023, updated the 20 Hz hearing threshold; see [ISO 226:2023](https://www.iso.org/standard/83117.html).)
 *   **Audio EQ Cookbook**: Bristow-Johnson, Robert. *Cookbook formulae for audio EQ biquad filter coefficients*. [W3C Audio WG / MusicDSP Cookbook](https://www.w3.org/TR/audio-eq-cookbook/).
 *   **Room EQ Wizard (REW) Documentation**: Mulcahy, John. *Room EQ Wizard User Guide — EQ Filters & Import/Export Formats*. [RE-Wizard Help](https://www.roomeqwizard.com/help/help/html/eqwindow.html).
 *   **Equalizer APO Documentation**: Theamer, Jonas. *Equalizer APO Configuration & Scripting Reference*. [Equalizer APO Documentation](https://sourceforge.net/p/equalizerapo/wiki/Documentation/).
