@@ -248,7 +248,7 @@ The verification plot below shows the residual deviation error across standard p
 ## References
 
 *   **ISO 226:2003 Standard**: *Acoustics — Normal equal-loudness-level contours*. International Organization for Standardization. [ISO 226:2003 Specification](https://www.iso.org/standard/34222.html). (Third edition, ISO 226:2023, updated the 20 Hz hearing threshold; see [ISO 226:2023](https://www.iso.org/standard/83117.html).)
-*   **Audio EQ Cookbook**: Bristow-Johnson, Robert. *Cookbook formulae for audio EQ biquad filter coefficients*. [W3C Audio WG / MusicDSP Cookbook](https://www.w3.org/TR/audio-eq-cookbook/).
+*   **Audio EQ Cookbook**: Bristow-Johnson, Robert. *Cookbook formulae for audio EQ biquad filter coefficients*. [Web Audio API / Audio EQ Cookbook](https://webaudio.github.io/Audio-EQ-Cookbook/audio-eq-cookbook.html).
 *   **Room EQ Wizard (REW) Documentation**: Mulcahy, John. *Room EQ Wizard User Guide — EQ Filters & Import/Export Formats*. [RE-Wizard Help](https://www.roomeqwizard.com/help/help/html/eqwindow.html).
 *   **Equalizer APO Documentation**: Theamer, Jonas. *Equalizer APO Configuration & Scripting Reference*. [Equalizer APO Documentation](https://sourceforge.net/p/equalizerapo/wiki/Documentation/).
 *   **Roon Labs Knowledge Base**: *Roon DSP Engine: Parametric EQ, Headroom Management & Convolution*. [Roon Labs Help](https://help.roonlabs.com/portal/en/kb/articles/dsp-engine).
