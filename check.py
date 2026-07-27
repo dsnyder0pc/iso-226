@@ -155,7 +155,10 @@ def main():
     plot_filename = f"iso_226_filter_error_for_{level_str}db.png"
 
     # Ensure filter file exists and matches reference level
-    ref_level = ensure_filter_file(args.level, md_filename, args.reference)
+    try:
+        ref_level = ensure_filter_file(args.level, md_filename, args.reference)
+    except subprocess.CalledProcessError:
+        sys.exit(1)
 
     # Read the PEQ filters from the Markdown table file
     filters = parse_markdown_filters(md_filename)

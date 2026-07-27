@@ -46,6 +46,8 @@ def iso226_spl(phon, f_arr=None):
     Returns:
         np.ndarray: Sound Pressure Level array.
     """
+    if phon < 0.0 or phon > 90.0:
+        raise ValueError(f"Phon level ({phon}) is out of valid ISO 226 range (0 to 90 phon).")
     if f_arr is None:
         f_arr = ISO_FREQ
     af = np.interp(f_arr, ISO_FREQ, ISO_AF)

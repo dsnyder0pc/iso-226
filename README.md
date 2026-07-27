@@ -28,7 +28,7 @@ Because equal-loudness compensation requires boosts in the low and high frequenc
 This project implements **Option 2**. The generator calculates the exact peak gain of the combined response and outputs the recommended negative preamp offset to ensure the entire filter curve remains at or below `0 dB`.
 
 ### Pre-generated REW Filters (No Python Required)
-For users who do not have a Python environment or prefer not to run scripts, pre-generated CamillaDSP YAML filter files for common listening levels (55 dB through 95 dB in 5 dB steps) are available directly in the [REW](REW) directory:
+For users who do not have a Python environment or prefer not to run scripts, pre-generated CamillaDSP YAML filter files for common listening levels (55 dB through 90 dB in 5 dB steps) are available directly in the [REW](REW) directory:
 
 *   [filter-55db.yml](REW/filter-55db.yml) (55 dB SPL)
 *   [filter-60db.yml](REW/filter-60db.yml) (60 dB SPL)
@@ -38,7 +38,6 @@ For users who do not have a Python environment or prefer not to run scripts, pre
 *   [filter-80db.yml](REW/filter-80db.yml) (80 dB SPL)
 *   [filter-85db.yml](REW/filter-85db.yml) (85 dB SPL - High / Loud)
 *   [filter-90db.yml](REW/filter-90db.yml) (90 dB SPL)
-*   [filter-95db.yml](REW/filter-95db.yml) (95 dB SPL)
 
 You can download and import these `.yml` files directly into Room EQ Wizard (REW) without installing Python.
 
@@ -73,8 +72,14 @@ Run the generator script by specifying your target average listening level in dB
 python loudness-filters.py --level <target_db> [--reference <reference_db>]
 ```
 
-*   `--level` (float, default: `65.0`): The target average room sound pressure level (SPL) in dB.
-*   `--reference` (float, default: `83.0`): The reference sound pressure level (SPL) in dB representing a flat playback response.
+*   `--level` (float, default: `65.0`): The target average room sound pressure level (SPL) in dB (valid range: `50.0` to `90.0` dB SPL).
+*   `--reference` (float, default: `83.0`): The reference sound pressure level (SPL) in dB representing a flat playback response (valid range: `70.0` to `90.0` dB SPL).
+
+> [!IMPORTANT]
+> **Parameter Bounds & Maximum Attenuation Limit (12 dB):**
+> * **`--level` Bounds**: Allowed range is **50.0 to 90.0 dB SPL**. Lower levels (e.g. 50–55 dB) are suitable for extremely quiet listening environments, while 90 dB is the upper bound of standard empirical ISO 226 data.
+> * **`--reference` Bounds**: Allowed range is **70.0 to 90.0 dB SPL**.
+> * **12 dB Headroom Attenuation Constraint**: DSP engines (such as Roon and REW) cap maximum per-filter preamp attenuation at 12.0 dB. If a requested `--level` and `--reference` pair requires more than 12.0 dB of headroom adjustment (e.g., `--level 50 --reference 83` which requires ~17 dB offset), the generator will refuse to build the filter set and ask you to select a higher target level or a lower reference level (e.g., `--reference 70`).
 
 > [!TIP]
 > **Why customize the reference level (`--reference`)?**

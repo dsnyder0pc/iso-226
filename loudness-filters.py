@@ -10,6 +10,7 @@ table file, and plots the combined frequency response to a PNG file.
 # pylint: disable=invalid-name
 
 import argparse
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit, minimize
@@ -17,6 +18,28 @@ from iso226_utils import ISO_FREQ, iso226_spl, get_filter_response
 
 # Standard reference level for flat playback
 REF_LEVEL = 83.0
+
+# Parameter boundary constants
+MIN_LEVEL = 50.0
+MAX_LEVEL = 90.0
+MIN_REFERENCE = 70.0
+MAX_REFERENCE = 90.0
+MAX_ATTENUATION_LIMIT = 12.0
+
+
+def validate_parameters(target_level, ref_level):
+    """Validates target level, reference level, and parameter bounds."""
+    if not (MIN_LEVEL <= target_level <= MAX_LEVEL):
+        raise ValueError(
+            f"Target playback level ({target_level} dB) must be between "
+            f"{MIN_LEVEL} and {MAX_LEVEL} dB SPL."
+        )
+    if not (MIN_REFERENCE <= ref_level <= MAX_REFERENCE):
+        raise ValueError(
+            f"Reference playback level ({ref_level} dB) must be between "
+            f"{MIN_REFERENCE} and {MAX_REFERENCE} dB SPL."
+        )
+
 
 # Base EQ filter structure (frequencies and Q factors) used for curve fitting optimization
 BASE_FILTERS = [
@@ -33,9 +56,11 @@ BASE_FILTERS = [
 ]
 
 
-def _calculate_ideal_delta(target_level):
+def _calculate_ideal_delta(target_level, ref_level=None):
     """Calculates ideal delta curve normalized at 1000 Hz."""
-    ref_spl = iso226_spl(REF_LEVEL, ISO_FREQ)
+    if ref_level is None:
+        ref_level = REF_LEVEL
+    ref_spl = iso226_spl(ref_level, ISO_FREQ)
     target_spl = iso226_spl(target_level, ISO_FREQ)
     return (target_spl - target_spl[17]) - (ref_spl - ref_spl[17])
 
@@ -74,12 +99,15 @@ def _optimize_filter_params(ideal_delta):
     return res.x[:10], res.x[10:20], res.x[20:30]
 
 
-def calculate_filters_for_level(target_level):
+def calculate_filters_for_level(target_level, ref_level=None):
     """Optimizes the EQ profile to fit the ISO 226 target delta curve at the requested target level,
 
     minimizing maximum residual error across preferred frequencies.
     """
-    ideal_delta = _calculate_ideal_delta(target_level)
+    if ref_level is None:
+        ref_level = REF_LEVEL
+    validate_parameters(target_level, ref_level)
+    ideal_delta = _calculate_ideal_delta(target_level, ref_level)
     gains_opt, fcs_opt, qs_opt = _optimize_filter_params(ideal_delta)
 
     scaled_filters = []
@@ -225,15 +253,27 @@ def write_camilladsp_yaml(filters, level, headroom_offset=0.0):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate Equal-Loudness PEQ Filters')
     parser.add_argument('--level', type=float, default=65.0,
-                        help='Target average playback level in dB (default: 65.0)')
+                        help=f'Target average playback level in dB (default: 65.0, range: {MIN_LEVEL}-{MAX_LEVEL})')
     parser.add_argument('--reference', type=float, default=83.0,
-                        help='Reference level for flat playback in dB (default: 83.0)')
+                        help=f'Reference level for flat playback in dB (default: 83.0, range: {MIN_REFERENCE}-{MAX_REFERENCE})')
     args = parser.parse_args()
 
     REF_LEVEL = args.reference
 
-    target_filters = calculate_filters_for_level(args.level)
-    offset = calculate_headroom_offset(target_filters)
-    write_markdown_table(target_filters, args.level, offset)
-    write_camilladsp_yaml(target_filters, args.level, offset)
-    plot_frequency_response(target_filters, args.level, offset, ref_level=REF_LEVEL)
+    try:
+        validate_parameters(args.level, args.reference)
+        target_filters = calculate_filters_for_level(args.level, args.reference)
+        offset = calculate_headroom_offset(target_filters)
+
+        if abs(offset) > MAX_ATTENUATION_LIMIT:
+            raise ValueError(
+                f"Required headroom adjustment ({offset:.2f} dB) exceeds maximum allowed attenuation "
+                f"limit of -{MAX_ATTENUATION_LIMIT:.1f} dB. Please select a higher target --level or a lower --reference level."
+            )
+
+        write_markdown_table(target_filters, args.level, offset)
+        write_camilladsp_yaml(target_filters, args.level, offset)
+        plot_frequency_response(target_filters, args.level, offset, ref_level=REF_LEVEL)
+    except ValueError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        sys.exit(1)
