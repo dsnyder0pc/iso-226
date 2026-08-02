@@ -487,11 +487,9 @@ doing serious work with equal-loudness contours should buy it.
 paywall-exclusive, it is not needed to *run* anything, and it is used only to
 check the implementation — so it is supplied locally by whoever owns a copy.
 
-The software is MIT licensed (see `LICENSE`). That licence covers the code, not
-ISO's coefficients, which are not mine to sub-license — see `NOTICE`. ISO
-confirmed on 1 August 2026 that reproducing Table 1 requires explicit
-permission, and a request is currently with ANSI, the US member body. If it is
-refused the coefficients will be removed and `NOTICE` updated accordingly.
+Permission for the Table 1 reproduction has been requested and is pending — see
+[License and third-party content](#license-and-third-party-content) below, and
+[NOTICE](NOTICE).
 
 Note that ISO's own free preview does **not** include Table 1; it covers the
 Foreword, Introduction, Scope, normative references and terms only. The
@@ -713,6 +711,23 @@ compensation have little hearing left above 12.5 kHz.
 * **`--scale` is a taste control, not an error correction.** If full
   compensation sounds like too much, use less. That is a legitimate preference,
   not a defect in the math.
+
+---
+
+## License and third-party content
+
+The software is MIT licensed — see [LICENSE](LICENSE).
+
+That licence covers this project's own code. It does **not** cover the ISO 226
+Table 1 coefficients reproduced in `iso226_utils.py`, which belong to ISO and
+are not mine to sub-license. ISO confirmed on 1 August 2026 that reproducing
+Table 1 requires explicit permission; a request is currently with ANSI, the ISO
+member body for the United States. If permission is refused the coefficients
+will be removed. See [NOTICE](NOTICE) for the details.
+
+This project is not a substitute for the standard. Anyone doing serious work
+with equal-loudness contours should [buy
+it](https://www.iso.org/standard/83117.html).
 
 ---
 
