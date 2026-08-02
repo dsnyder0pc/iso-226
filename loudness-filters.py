@@ -14,6 +14,7 @@ correction, and bands 6-10 refine it. A listener can enter five bands and stop.
 
 import argparse
 import sys
+import time
 
 import numpy as np
 import yaml
@@ -72,11 +73,6 @@ MIN_SPACING_RATIO = 1.7
 # If the fit cannot get within this of the target, the target is unreachable
 # within the per-band gain budget and the request should be refused.
 FIT_ERROR_LIMIT_DB = 1.0
-
-# Rough wall-clock for one preset, quoted so a silent optimizer is not mistaken
-# for a hung one. Two tiers, four multistarts each, ~300 SLSQP iterations.
-EXPECTED_RUNTIME_S = 35.0
-
 
 def _progress(message, end="\n"):
     """Progress to stderr, so stdout stays usable for piping the tables."""
@@ -230,20 +226,25 @@ def calculate_filters(target_level, ref_level, scale=1.0):
 
     _progress(f"Fitting listening level {_level_str(target_level)} dB against a "
               f"{ref_level:g} dB reference, scale {scale:.2f}.")
-    _progress(f"Constrained minimax with multistart; expect roughly "
-              f"{EXPECTED_RUNTIME_S:.0f} seconds.")
+    # No time estimate: this is a constrained minimax with multistart, and how
+    # long it takes depends entirely on the machine. Each tier reports its own
+    # elapsed time instead, which is true everywhere.
+    _progress("Constrained minimax with multistart; tens of seconds per tier "
+              "on a typical desktop, longer on low-power hardware.")
 
     _progress("  bands 1-5  (essential) ...", end=" ")
+    started = time.perf_counter()
     _, tier1 = _fit_bands(TIER1_TYPES, TIER1_FC_BOUNDS, grid, target, in_band,
                           tier1_budget, seed=3)
     tier1 = _round_filters(tier1)
-    _progress("done")
+    _progress(f"done ({time.perf_counter() - started:.1f} s)")
 
     _progress("  bands 6-10 (refinement) ...", end=" ")
+    started = time.perf_counter()
     _, tier2 = _fit_bands(TIER2_TYPES, TIER2_FC_BOUNDS, grid, target, in_band,
                           tier2_budget, fixed=tier1, seed=5)
     tier2 = _round_filters(tier2)
-    _progress("done")
+    _progress(f"done ({time.perf_counter() - started:.1f} s)")
 
     def published_error(filters):
         resp = get_filter_response(filters, grid, DESIGN_FS)
@@ -435,8 +436,46 @@ TABLE_HEAD = [
 ]
 
 
+def is_null_correction(result):
+    """True when every band rounds to zero at the host's entry precision.
+
+    Happens when the listening level equals the mastering reference: the ideal
+    correction is identically zero, and the honest output is a sentence rather
+    than ten bands of 0.00 dB. The preset still ships, because a listener at
+    their reference level needs to be told to apply nothing -- without it they
+    would reach for the nearest rung and apply a correction they do not need.
+    """
+    return all(abs(f[2]) < HOST_GAIN_PRECISION_DB / 2 for f in result['all'])
+
+
 def write_markdown_table(result, level, ref_level, scale, headroom, filename):
     """Write the two-tier PEQ table."""
+    if is_null_correction(result):
+        content = "\n".join([
+            f"### No Compensation Needed at {_level_str(level)} dB",
+            "",
+            f"*Mastering reference {ref_level:g} dB"
+            + (" (default)" if ref_level == DEFAULT_REFERENCE else "")
+            + f" · listening level {_level_str(level)} dB · scale {scale:.2f}*",
+            "",
+            "You are listening at the level this recording was mastered for, so "
+            "there is nothing to correct: the ideal equal-loudness compensation "
+            "here is 0.00 dB at every frequency.",
+            "",
+            "**Apply no filters and no headroom adjustment.** If you are using a "
+            "preset from another listening level, disable it.",
+            "",
+            "This file exists so that the ladder covers your case explicitly. "
+            "Reaching for the nearest neighbouring preset instead would apply "
+            "about 1.6 dB of correction you do not want.",
+            "",
+        ])
+        with open(filename, 'w', encoding='utf-8') as handle:
+            handle.write(content)
+        print(content)
+        print(f"Saved PEQ table to: {filename}")
+        return
+
     lines = [
         f"### Equal-Loudness Compensation EQ for {_level_str(level)} dB",
         "",
@@ -500,19 +539,30 @@ def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
             },
         }
 
-    header = [
-        f"# Equal-Loudness Compensation EQ for {_level_str(level)} dB",
-        f"# Mastering reference: {ref_level:g} dB"
-        + ("  (default)" if ref_level == DEFAULT_REFERENCE else "")
-        + f" · listening level: {_level_str(level)} dB · scale: {scale:.2f}",
-        f"# Headroom adjustment: {headroom:.1f} dB "
-        f"(apply as negative preamp gain)",
-        f"# Designed at {DESIGN_FS / 1000:.1f} kHz.",
-        f"# Bands 1-{TIER_SIZE} are a complete correction on their own "
-        f"(max error {result['error_essential']:.4f} dB);",
-        f"# bands {TIER_SIZE + 1}-10 refine it to {result['error_all']:.4f} dB.",
-        "",
-    ]
+    if is_null_correction(result):
+        header = [
+            f"# No compensation needed at {_level_str(level)} dB.",
+            f"# Listening level equals the mastering reference "
+            f"({ref_level:g} dB), so the ideal correction is 0.00 dB at every",
+            "# frequency. Apply no filters and no headroom adjustment.",
+            "# The bands below are all zero-gain and are included only so this",
+            "# file is a valid, loadable CamillaDSP configuration.",
+            "",
+        ]
+    else:
+        header = [
+            f"# Equal-Loudness Compensation EQ for {_level_str(level)} dB",
+            f"# Mastering reference: {ref_level:g} dB"
+            + ("  (default)" if ref_level == DEFAULT_REFERENCE else "")
+            + f" · listening level: {_level_str(level)} dB · scale: {scale:.2f}",
+            f"# Headroom adjustment: {headroom:.1f} dB "
+            f"(apply as negative preamp gain)",
+            f"# Designed at {DESIGN_FS / 1000:.1f} kHz.",
+            f"# Bands 1-{TIER_SIZE} are a complete correction on their own "
+            f"(max error {result['error_essential']:.4f} dB);",
+            f"# bands {TIER_SIZE + 1}-10 refine it to {result['error_all']:.4f} dB.",
+            "",
+        ]
     body = yaml.dump({'filters': filters}, sort_keys=False, default_flow_style=False)
     with open(filename, 'w', encoding='utf-8') as handle:
         handle.write("\n".join(header) + body)

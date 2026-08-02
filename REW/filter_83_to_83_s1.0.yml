@@ -1,0 +1,76 @@
+# No compensation needed at 83 dB.
+# Listening level equals the mastering reference (83 dB), so the ideal correction is 0.00 dB at every
+# frequency. Apply no filters and no headroom adjustment.
+# The bands below are all zero-gain and are included only so this
+# file is a valid, loadable CamillaDSP configuration.
+filters:
+  band_1:
+    type: Biquad
+    parameters:
+      type: Lowshelf
+      freq: 60.0
+      gain: 0.0
+      q: 0.7
+  band_2:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 232.4
+      gain: 0.0
+      q: 0.7
+  band_3:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 848.5
+      gain: 0.0
+      q: 0.7
+  band_4:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 2966.5
+      gain: 0.0
+      q: 0.7
+  band_5:
+    type: Biquad
+    parameters:
+      type: Highshelf
+      freq: 8124.0
+      gain: 0.0
+      q: 0.7
+  band_6:
+    type: Biquad
+    parameters:
+      type: Lowshelf
+      freq: 40.0
+      gain: 0.0
+      q: 0.7
+  band_7:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 154.9
+      gain: 0.0
+      q: 0.7
+  band_8:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 574.5
+      gain: 0.0
+      q: 0.7
+  band_9:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 2097.6
+      gain: 0.0
+      q: 0.7
+  band_10:
+    type: Biquad
+    parameters:
+      type: Highshelf
+      freq: 6633.2
+      gain: 0.0
+      q: 0.7

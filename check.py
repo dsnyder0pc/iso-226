@@ -160,6 +160,14 @@ def main():
         return 1
 
     filters = parse_markdown_filters(md_filename)
+    if not filters and ref == args.level:
+        # The generator writes prose instead of a table when the listening level
+        # equals the mastering reference: the ideal correction is identically
+        # zero, so there is nothing to fit and nothing to verify.
+        print(f"Listening level equals the mastering reference ({ref:g} dB), so "
+              "the ideal correction is 0.00 dB at every frequency.")
+        print("No filters to verify.")
+        return 0
     if len(filters) < ESSENTIAL_BANDS:
         print(f"Error: '{md_filename}' contains only {len(filters)} filter rows.",
               file=sys.stderr)

@@ -257,11 +257,15 @@ fair summary of how much the extra bands are worth:
 | :--- | :--- | :--- |
 | 62 dB | 0.0984 dB | 0.0864 dB |
 | 65 dB | 0.0535 dB | 0.0506 dB |
-| 70 dB | 0.0506 dB | 0.0436 dB |
+| 68 dB | 0.0783 dB | 0.0453 dB |
+| 71 dB | 0.0565 dB | 0.0437 dB |
+| 74 dB | 0.0666 dB | 0.0513 dB |
 | 75 dB | 0.0433 dB | 0.0432 dB |
+| 77 dB | 0.0462 dB | 0.0376 dB |
 | 80 dB | 0.0218 dB | 0.0197 dB |
 | 85 dB | 0.0172 dB | 0.0159 dB |
-| 90 dB | 0.0523 dB | 0.0421 dB |
+| 86 dB | 0.0315 dB | 0.0197 dB |
+| 89 dB | 0.0532 dB | 0.0393 dB |
 
 The 62 dB preset is the loosest of the set, at 0.098 dB. That is expected: it
 sits against the 12 dB gain ceiling, so the optimizer has less freedom than
@@ -288,13 +292,31 @@ Ready-made CamillaDSP YAML files for an 83 dB mastering reference are in the
 
 | File | Listening level | Relative to reference |
 | :--- | :--- | :--- |
-| [filter_83_to_62_s1.0.yml](REW/filter_83_to_62_s1.0.yml) | 62 dB — very quiet | −21 dB |
-| [filter_83_to_65_s1.0.yml](REW/filter_83_to_65_s1.0.yml) | 65 dB — quiet | −18 dB |
-| [filter_83_to_70_s1.0.yml](REW/filter_83_to_70_s1.0.yml) | 70 dB | −13 dB |
-| [filter_83_to_75_s1.0.yml](REW/filter_83_to_75_s1.0.yml) | 75 dB — moderate | −8 dB |
-| [filter_83_to_80_s1.0.yml](REW/filter_83_to_80_s1.0.yml) | 80 dB | −3 dB |
-| [filter_83_to_85_s1.0.yml](REW/filter_83_to_85_s1.0.yml) | 85 dB — loud | +2 dB |
-| [filter_83_to_90_s1.0.yml](REW/filter_83_to_90_s1.0.yml) | 90 dB | +7 dB |
+| [filter_83_to_62_s1.0](REW/filter_83_to_62_s1.0.yml) | 62 dB — very quiet | −21 dB |
+| [filter_83_to_65_s1.0](REW/filter_83_to_65_s1.0.yml) | 65 dB — quiet | −18 dB |
+| [filter_83_to_68_s1.0](REW/filter_83_to_68_s1.0.yml) | 68 dB | −15 dB |
+| [filter_83_to_71_s1.0](REW/filter_83_to_71_s1.0.yml) | 71 dB | −12 dB |
+| [filter_83_to_74_s1.0](REW/filter_83_to_74_s1.0.yml) | 74 dB | −9 dB |
+| [filter_83_to_75_s1.0](REW/filter_83_to_75_s1.0.yml) | 75 dB — moderate | −8 dB |
+| [filter_83_to_77_s1.0](REW/filter_83_to_77_s1.0.yml) | 77 dB | −6 dB |
+| [filter_83_to_80_s1.0](REW/filter_83_to_80_s1.0.yml) | 80 dB | −3 dB |
+| [filter_83_to_83_s1.0](REW/filter_83_to_83_s1.0.md) | 83 dB — at reference | 0 dB *(no correction)* |
+| [filter_83_to_85_s1.0](REW/filter_83_to_85_s1.0.yml) | 85 dB — loud | +2 dB |
+| [filter_83_to_86_s1.0](REW/filter_83_to_86_s1.0.yml) | 86 dB | +3 dB |
+| [filter_83_to_89_s1.0](REW/filter_83_to_89_s1.0.yml) | 89 dB | +6 dB |
+
+Each comes in two forms: **`.yml`** for loading straight into REW, and **`.md`**
+with the filter tables for typing by hand into Roon, Equalizer APO or a hardware
+DSP. The ladder runs in 3 dB steps, so a listener whose measured level falls
+between two rungs loses at most about 0.8 dB by snapping to the nearer one —
+comfortably inside the uncertainty of their own SPL measurement. The 75 and
+85 dB entries are not on the 3 dB grid; they are there because the worked
+examples below use them.
+
+The 83 dB entry is the case where you are already listening at the level the
+recording was mastered for, so the correct answer is to apply nothing. It ships
+as an explicit rung because reaching for the nearest neighbour instead would
+apply roughly 1.6 dB of correction you do not want.
 
 62 dB is the quietest preset possible at an 83 dB reference: below that the
 correction needs more than the 12 dB Roon allows.
@@ -309,15 +331,20 @@ Roon's entry precision.
 
 So each file above serves any reference at the same offset:
 
-| File | −offset | ref 72 | ref 75 | ref 78 | ref 80 | ref 83 | ref 85 |
+| File | offset | ref 72 | ref 75 | ref 78 | ref 80 | ref 83 | ref 85 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `..._to_62_...` | −21 | 51 | 54 | 57 | 59 | **62** | 64 |
 | `..._to_65_...` | −18 | 54 | 57 | 60 | 62 | **65** | 67 |
-| `..._to_70_...` | −13 | 59 | 62 | 65 | 67 | **70** | 72 |
+| `..._to_68_...` | −15 | 57 | 60 | 63 | 65 | **68** | 70 |
+| `..._to_71_...` | −12 | 60 | 63 | 66 | 68 | **71** | 73 |
+| `..._to_74_...` | −9 | 63 | 66 | 69 | 71 | **74** | 76 |
 | `..._to_75_...` | −8 | 64 | 67 | 70 | 72 | **75** | 77 |
+| `..._to_77_...` | −6 | 66 | 69 | 72 | 74 | **77** | 79 |
 | `..._to_80_...` | −3 | 69 | 72 | 75 | 77 | **80** | 82 |
+| `..._to_83_...` | 0 | 72 | 75 | 78 | 80 | **83** | 85 |
 | `..._to_85_...` | +2 | 74 | 77 | 80 | 82 | **85** | 87 |
-| `..._to_90_...` | +7 | 79 | 82 | 85 | 87 | **90** | 92 |
+| `..._to_86_...` | +3 | 75 | 78 | 81 | 83 | **86** | 88 |
+| `..._to_89_...` | +6 | 78 | 81 | 84 | 86 | **89** | 91 |
 
 Listening at 60 dB to something mastered for 78 dB? That is −18, so
 `filter_83_to_65_s1.0.yml` is your file. If you would rather have one named for
@@ -396,12 +423,14 @@ pre-generated 83 dB-referenced presets exist for them.
 ## Generated Presets
 
 The essential five bands for the three headline levels, all referenced to
-83 dB. These are the values to type into Roon's Parametric EQ. The optional
+83 dB. Errors here are evaluated at the 29 ISO preferred frequencies, matching
+the plots below and what `check.py` prints; the ladder table earlier uses the
+denser fitting grid, which is why the figures differ slightly. These are the values to type into Roon's Parametric EQ. The optional
 refinement bands are in the generated `.md` tables and in the YAML files; as discussed above, they round to 0.0 dB at Roon's entry precision.
 
 ### Quiet — 65 dB
 
-**Headroom adjustment `-9.5 dB`** · max residual error **0.0535 dB**
+**Headroom adjustment `-9.5 dB`** · max residual error **0.0533 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
@@ -416,7 +445,7 @@ refinement bands are in the generated `.md` tables and in the YAML files; as dis
 
 ### Moderate — 75 dB
 
-**Headroom adjustment `-4.2 dB`** · max residual error **0.0433 dB**
+**Headroom adjustment `-4.2 dB`** · max residual error **0.0486 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
@@ -433,7 +462,7 @@ refinement bands are in the generated `.md` tables and in the YAML files; as dis
 
 Above the 83 dB reference, so the correction is a slight *cut* at the extremes.
 
-**Headroom adjustment `-0.1 dB`** · max residual error **0.0172 dB**
+**Headroom adjustment `-0.1 dB`** · max residual error **0.0163 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |

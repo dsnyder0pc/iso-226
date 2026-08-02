@@ -23,7 +23,17 @@ python check.py --level <db> [--reference <db>] [--scale <s>]
 # Regression tests — run after touching any math
 python -m pytest tests/                  # all 60 (~31 s)
 python -m pytest tests/ -m "not slow"    # 52 fast ones (~2 s)
+
+# Rebuild every committed preset and figure (several minutes)
+python regenerate.py
+python regenerate.py --list              # what would be generated, without doing it
 ```
+
+`regenerate.py` is the single source of truth for which presets ship — the
+`LADDER`, `EXTRA` and `FEATURED` lists in that file, not the contents of `REW/`.
+Run it after any change to the math, the optimizer or the coefficients, then
+reconcile the README, which quotes headroom values, residual errors and filter
+tables.
 
 Tests marked `slow` share one session-scoped `preset` fixture that runs the
 optimizer once (~30 s) and assert many shipped properties against it. Add new
