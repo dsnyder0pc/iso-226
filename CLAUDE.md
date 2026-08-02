@@ -27,6 +27,10 @@ python -m pytest tests/ -m "not slow"    # 52 fast ones (~2 s)
 # Rebuild every committed preset and figure (several minutes)
 python regenerate.py
 python regenerate.py --list              # what would be generated, without doing it
+
+# Linters — both must be clean before committing
+python -m pylint check.py loudness-filters.py iso226_utils.py regenerate.py tests/
+shellcheck -S style path/to/script.sh    # any Bash added to the repo
 ```
 
 `regenerate.py` is the single source of truth for which presets ship — the
@@ -100,6 +104,43 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
   likely to earn their keep: `check.py` matches filter-type strings and table
   columns *positionally*, and nothing else notices when one side of that
   contract changes.
+
+## Code quality bar
+
+**pylint must reach 10.00/10.** Not "close enough" — the owner's standing
+preference is a clean run. Treat every finding as a real defect until shown
+otherwise, because on this project they repeatedly have been: a lint pass found
+`check.py` calling `sys.path.insert` *after* the import it existed to enable,
+which worked only because Python happens to put a script's own directory on the
+path.
+
+The single exception is a fix that would genuinely harm clarity or
+maintainability. When that applies:
+
+* disable the check **at the site**, with a comment saying why — never in a
+  config file, and never a bare `# pylint: disable=` with no reasoning;
+* prefer restructuring over suppressing. Four functions currently exceed the
+  argument limit because `(level, reference, scale)` travels together through
+  seven of them; the answer is a small frozen parameter object, not a disable
+  comment.
+
+Existing documented exceptions, all deliberate: `wrong-import-position` where
+`sys.path` setup or matplotlib's backend selection must precede imports;
+`import-outside-toplevel` for the lazy matplotlib import, which costs about a
+second and is not needed by most invocations; `redefined-outer-name` in
+`conftest.py`, where one pytest fixture requesting another necessarily shadows
+the name.
+
+**Known gap:** the score is 9.85. The remaining findings are all `R0913` /
+`R0914` on the argument and local counts described above. They are left visible
+on purpose — suppressing them would hide the refactor they are pointing at.
+That refactor belongs with the Flask work, which needs the same validated
+parameter bundle from query parameters.
+
+**Any Bash added to this repo must pass `shellcheck -S style` cleanly.** There
+is essentially no excuse for a finding at that level; fix the script rather than
+silencing the check. (There are no shell scripts here at present — orchestration
+lives in `regenerate.py` — so this applies to anything new.)
 
 ## Invariants — do not break these
 
