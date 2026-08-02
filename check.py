@@ -139,8 +139,8 @@ def main():
     """Verify a generated filter set and plot its residual error."""
     parser = argparse.ArgumentParser(
         description='Verify equal-loudness PEQ filter residual error.')
-    parser.add_argument('--level', type=float, default=65.0,
-                        help='Listening level in dB SPL (default: 65.0)')
+    parser.add_argument('--level', type=float, required=True,
+                        help='Listening level in dB SPL (required, no default)')
     parser.add_argument('--reference', type=float, default=DEFAULT_REFERENCE,
                         help=f'Mastering reference level in dB SPL '
                              f'(default: {DEFAULT_REFERENCE:g})')

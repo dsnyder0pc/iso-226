@@ -77,9 +77,16 @@ python loudness-filters.py --level <listening_db> [--reference <mastering_db>] [
 
 | Option | Default | Range | Meaning |
 | :--- | :--- | :--- | :--- |
-| `--level` | 65.0 | 50–90 | How loud it actually is in your room, **measured**. |
+| `--level` | **required** | 50–90 | How loud it actually is in your room, **measured**. |
 | `--reference` | 83.0 | 70–90 | How loud the recording was mastered to sound correct at. A property of the *recording*. |
 | `--scale` | 1.0 | 0.1–1.0 | Fraction of the theoretical correction to apply. |
+
+`--level` is deliberately required and has no default. It is the one value that
+is a property of *your room* rather than of the recording, so there is no
+sensible figure to guess on your behalf — and a wrong one is the single largest
+error source in the whole system. `--reference` and `--scale` do have sensible
+defaults: 83 dB is the mastering convention, and 1.0 is the full theoretical
+correction.
 
 Keeping `--level` and `--reference` conceptually distinct matters. `--level` is
 something you measure; `--reference` is something you know (or assume) about the
@@ -88,8 +95,8 @@ when it isn't — see *Recordings mastered quietly* below.
 
 Three files are written per preset, named
 `filter_<reference>_to_<level>_s<scale>`: `.md` (the tables), `.yml`
-(CamillaDSP YAML for REW import) and `.png` (the response plot). So the default
-65 dB case produces `filter_83_to_65_s1.0.md` and friends. Both levels appear in
+(CamillaDSP YAML for REW import) and `.png` (the response plot). So
+`--level 65` produces `filter_83_to_65_s1.0.md` and friends. Both levels appear in
 the name because a compensation curve is defined by the *pair*, not by the
 listening level alone.
 

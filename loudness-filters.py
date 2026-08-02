@@ -73,6 +73,15 @@ MIN_SPACING_RATIO = 1.7
 # within the per-band gain budget and the request should be refused.
 FIT_ERROR_LIMIT_DB = 1.0
 
+# Rough wall-clock for one preset, quoted so a silent optimizer is not mistaken
+# for a hung one. Two tiers, four multistarts each, ~300 SLSQP iterations.
+EXPECTED_RUNTIME_S = 35.0
+
+
+def _progress(message, end="\n"):
+    """Progress to stderr, so stdout stays usable for piping the tables."""
+    print(message, end=end, file=sys.stderr, flush=True)
+
 # --- Filter topology --------------------------------------------------------
 # Both tiers span the full spectrum. Treble compensation belongs in the
 # essential set: at low levels the loss of perceived treble is as consequential
@@ -219,13 +228,22 @@ def calculate_filters(target_level, ref_level, scale=1.0):
     tier2_budget = max(MIN_REFINEMENT_GAIN_BUDGET,
                        REFINEMENT_GAIN_BUDGET_FACTOR * span)
 
+    _progress(f"Fitting listening level {_level_str(target_level)} dB against a "
+              f"{ref_level:g} dB reference, scale {scale:.2f}.")
+    _progress(f"Constrained minimax with multistart; expect roughly "
+              f"{EXPECTED_RUNTIME_S:.0f} seconds.")
+
+    _progress("  bands 1-5  (essential) ...", end=" ")
     _, tier1 = _fit_bands(TIER1_TYPES, TIER1_FC_BOUNDS, grid, target, in_band,
                           tier1_budget, seed=3)
     tier1 = _round_filters(tier1)
+    _progress("done")
 
+    _progress("  bands 6-10 (refinement) ...", end=" ")
     _, tier2 = _fit_bands(TIER2_TYPES, TIER2_FC_BOUNDS, grid, target, in_band,
                           tier2_budget, fixed=tier1, seed=5)
     tier2 = _round_filters(tier2)
+    _progress("done")
 
     def published_error(filters):
         resp = get_filter_response(filters, grid, DESIGN_FS)
@@ -555,9 +573,12 @@ def main():
     """Parse arguments, fit the filter set, and write all output files."""
     parser = argparse.ArgumentParser(
         description='Generate equal-loudness compensation PEQ filters.')
-    parser.add_argument('--level', type=float, default=65.0,
-                        help=f'Measured listening level in dB SPL '
-                             f'(default: 65.0, range: {MIN_LEVEL}-{MAX_LEVEL})')
+    parser.add_argument('--level', type=float, required=True,
+                        help=f'Measured listening level in dB SPL, at the '
+                             f'listening position (required, range: '
+                             f'{MIN_LEVEL}-{MAX_LEVEL}). There is no default: '
+                             f'this is a property of your room, not of the '
+                             f'recording.')
     parser.add_argument('--reference', type=float, default=DEFAULT_REFERENCE,
                         help=f'Level the recording was mastered for, in dB SPL '
                              f'(default: 83.0, range: {MIN_REFERENCE}-{MAX_REFERENCE})')
