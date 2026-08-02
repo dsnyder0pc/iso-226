@@ -1,13 +1,23 @@
 """
-ISO 226 equal-loudness contours and biquad filter calculation helper.
+ISO 226 equal-loudness contours, target-curve construction, and biquad helpers.
+
+Equal-loudness data and Formula (1) are from ISO 226:2023 (third edition),
+which supersedes ISO 226:2003. The third edition revised Formula (1) itself and
+every alpha_f in Table 1; the two editions are not interchangeable.
 """
 
 import numpy as np
 from scipy.signal import freqz
 
-# ISO 226 Standard Coefficients for Preferred Frequencies
-# Per-frequency alpha_f, L_U, and T_f values from ISO 226:2003 Table 1.
-# T_f at 20 Hz updated to 78.1 dB per ISO 226:2023 (aligned with ISO 389-7:2019).
+# ---------------------------------------------------------------------------
+# ISO 226:2023 Table 1 — per-frequency coefficients at the ISO 266 preferred
+# third-octave frequencies.
+#
+# These are the third-edition values. They differ throughout from ISO 226:2003:
+# every alpha_f changed when the loudness exponent at 1 kHz was revised from
+# 0.25 to 0.30, and several L_U values moved by 0.1 dB. Do not mix the two
+# editions' tables -- Formula (1) changed as well (see iso226_spl).
+# ---------------------------------------------------------------------------
 ISO_FREQ = np.array([
     20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0, 200.0,
     250.0, 315.0, 400.0, 500.0, 630.0, 800.0, 1000.0, 1250.0, 1600.0,
@@ -15,15 +25,15 @@ ISO_FREQ = np.array([
 ])
 
 ISO_AF = np.array([
-    0.532, 0.506, 0.480, 0.455, 0.432, 0.409, 0.387, 0.367, 0.349, 0.330,
-    0.315, 0.301, 0.288, 0.276, 0.267, 0.259, 0.253, 0.250, 0.246, 0.244,
-    0.243, 0.243, 0.243, 0.242, 0.242, 0.245, 0.254, 0.271, 0.301
+    0.635, 0.602, 0.569, 0.537, 0.509, 0.482, 0.456, 0.433, 0.412, 0.391,
+    0.373, 0.357, 0.343, 0.330, 0.320, 0.311, 0.303, 0.300, 0.295, 0.292,
+    0.290, 0.290, 0.289, 0.289, 0.289, 0.293, 0.303, 0.323, 0.354
 ])
 
 ISO_LU = np.array([
-    -31.6, -27.2, -23.0, -19.1, -15.9, -13.0, -10.3, -8.1, -6.2, -4.5,
-    -3.1, -2.0, -1.1, -0.4, 0.0, 0.3, 0.5, 0.0, -2.7, -4.1,
-    -1.0, 1.7, 2.5, 1.2, -2.1, -7.1, -11.2, -10.7, -3.1
+    -31.5, -27.2, -23.1, -19.3, -16.1, -13.1, -10.4, -8.2, -6.3, -4.6,
+    -3.2, -2.1, -1.2, -0.5, 0.0, 0.4, 0.5, 0.0, -2.7, -4.2,
+    -1.2, 1.4, 2.3, 1.0, -2.3, -7.2, -11.2, -10.9, -3.5
 ])
 
 ISO_TF = np.array([
@@ -32,57 +42,168 @@ ISO_TF = np.array([
     -1.3, -4.2, -6.0, -5.4, -1.5, 6.0, 12.6, 13.9, 12.3
 ])
 
+# Reference-tone quantities appearing in Formula (1). The 1 kHz exponent moving
+# from 0.25 (2003) to 0.30 is the change that shifted the whole coefficient set.
+ALPHA_R = 0.30          # exponent for loudness perception at 1 kHz
+T_R = 2.4               # threshold of hearing at 1 kHz, dB
+P0_OVER_PA_SQ = 4e-10   # (p0/pa)^2, p0 = 20 uPa, pa = 1 Pa
+
+# Index of 1000 Hz in ISO_FREQ: every curve here is normalized to 0 dB there.
+REF_1KHZ_INDEX = 17
+
+# ISO 226:2023 s4.1 states Formula (1) applies from a lower limit of 20 phon
+# up to 90 phon (20 Hz - 4 kHz) and 80 phon (5 kHz - 12.5 kHz).
+ISO226_PHON_MIN = 20.0
+ISO226_PHON_MAX = 90.0
+ISO226_PHON_MAX_HF = 80.0
+ISO226_HF_LIMIT_HZ = 5000.0
+
+# Tolerance for the Annex B regression check. ISO 226:2023 Table B.1 is printed
+# to 0.1 dB, so agreement within 0.05 dB is exact to the precision the standard
+# publishes. The contour values themselves are ISO's and are not redistributable;
+# they live in the gitignored reference/annex_b_2023.py -- see
+# tests/annex_b_reference.py.example.
+ANNEX_B_TOLERANCE_DB = 0.05
+
+# ---------------------------------------------------------------------------
+# Design constants
+# ---------------------------------------------------------------------------
+# Filters are designed and analysed at 44.1 kHz: it is still the most common
+# rate for digital music, and biquad frequency warping near Nyquist makes it
+# the least forgiving of the common rates for a high-frequency shelf.
+DESIGN_FS = 44100.0
+
+# Headroom is verified across all of these; the worst case is published.
+VERIFY_RATES = (44100.0, 48000.0, 96000.0, 192000.0)
+
+# The ISO data stops at 12.5 kHz and 20 Hz. Outside that range the target is
+# held flat at the edge value, and the fit is constrained (but not optimized)
+# there, so the extrapolation is bounded and deliberate rather than accidental.
+EXTRAP_LOW_HZ = 10.0
+EXTRAP_HIGH_HZ = 20000.0
+EXTRAP_TOLERANCE_DB = 1.5
+
 
 def iso226_spl(phon, f_arr=None):
-    """Calculates Sound Pressure Level (dB SPL) for a given phon level per ISO 226.
+    """Sound pressure level (dB SPL) for a given loudness level, per ISO 226.
 
-    Uses the standard formula from ISO 226:2003 with the updated hearing
-    threshold at 20 Hz from ISO 226:2023 (aligned with ISO 389-7:2019).
+    Implements ISO 226:2023 Formula (1). Coefficients are interpolated in
+    log-frequency (the axis they are tabulated on) when ``f_arr`` falls between
+    the standard preferred frequencies.
 
     Args:
-        phon (float): Phon level (valid range: 0 to 90).
-        f_arr (np.ndarray): Frequencies to calculate for. Defaults to ISO_FREQ.
+        phon (float): Loudness level in phon. ISO 226:2023 s4.1 defines
+            Formula (1) from 20 phon up to 90 phon (20 Hz - 4 kHz) and
+            80 phon (5 kHz - 12.5 kHz).
+        f_arr (np.ndarray): Frequencies to evaluate. Defaults to ISO_FREQ.
 
     Returns:
-        np.ndarray: Sound Pressure Level array.
+        np.ndarray: Sound pressure level in dB SPL.
     """
-    if phon < 0.0 or phon > 90.0:
-        raise ValueError(f"Phon level ({phon}) is out of valid ISO 226 range (0 to 90 phon).")
+    if phon < ISO226_PHON_MIN or phon > ISO226_PHON_MAX:
+        raise ValueError(
+            f"Loudness level ({phon} phon) is outside the range for which "
+            f"ISO 226:2023 Formula (1) is defined "
+            f"({ISO226_PHON_MIN:.0f} to {ISO226_PHON_MAX:.0f} phon)."
+        )
     if f_arr is None:
         f_arr = ISO_FREQ
-    af = np.interp(f_arr, ISO_FREQ, ISO_AF)
-    lu = np.interp(f_arr, ISO_FREQ, ISO_LU)
-    tf = np.interp(f_arr, ISO_FREQ, ISO_TF)
 
-    # ISO 226:2003 standard formula (Section 4.1)
-    a_f = 4.47e-3 * (10 ** (0.025 * phon) - 1.15) \
-        + (0.4 * 10 ** (((tf + lu) / 10.0) - 9.0)) ** af
-    l_p = (10.0 / af) * np.log10(a_f) - lu + 94.0
-    return l_p
+    log_f = np.log10(np.asarray(f_arr, dtype=float))
+    log_iso = np.log10(ISO_FREQ)
+    af = np.interp(log_f, log_iso, ISO_AF)
+    lu = np.interp(log_f, log_iso, ISO_LU)
+    tf = np.interp(log_f, log_iso, ISO_TF)
+
+    # ISO 226:2023 Formula (1).
+    #
+    # The bracketed difference is the loudness of the 1 kHz reference tone above
+    # its own threshold; the trailing term is the threshold at frequency f. Both
+    # loudness terms at frequency f carry alpha_f, while the reference bracket
+    # carries alpha_r -- equating the two is what defines an equal-loudness
+    # contour. The (p0/pa)^(2(alpha_r - alpha_f)) factor reconciles the differing
+    # exponents, and is unity at 1 kHz where alpha_f == alpha_r.
+    a_f = (P0_OVER_PA_SQ ** (ALPHA_R - af)
+           * (10 ** (0.1 * ALPHA_R * phon) - 10 ** (0.1 * ALPHA_R * T_R))
+           + 10 ** (0.1 * af * (tf + lu)))
+    return (10.0 / af) * np.log10(a_f) - lu
+
+
+def ideal_delta(level, ref_level, scale=1.0):
+    """The equal-loudness compensation target at the ISO preferred frequencies.
+
+    The difference in contour *shape* between the listening level and the
+    mastering (reference) level, normalized to 0 dB at 1 kHz.
+
+    Because this is a difference of two contours, a systematic offset shared by
+    both levels -- such as reading broadband C-weighted SPL rather than the
+    loudness level of an equally loud 1 kHz tone -- cancels to first order.
+    What matters is that ``level`` and ``ref_level`` are measured the same way.
+
+    Args:
+        level (float): Listening level, in dB SPL as measured in the room.
+        ref_level (float): Level the recording was mastered to sound correct at.
+        scale (float): Fraction of the theoretical correction to apply.
+
+    Returns:
+        np.ndarray: Target gain in dB at each ISO_FREQ.
+    """
+    target_spl = iso226_spl(level)
+    ref_spl = iso226_spl(ref_level)
+    delta = ((target_spl - target_spl[REF_1KHZ_INDEX])
+             - (ref_spl - ref_spl[REF_1KHZ_INDEX]))
+    return delta * scale
+
+
+def design_grid():
+    """Frequency grid used for filter fitting.
+
+    Returns three arrays: the sub-20 Hz extrapolation region, the ISO-backed
+    region that the minimax objective actually minimizes over, and the
+    above-12.5 kHz extrapolation region.
+    """
+    low = np.logspace(np.log10(EXTRAP_LOW_HZ), np.log10(19.5), 12)
+    in_band = np.logspace(np.log10(ISO_FREQ[0]), np.log10(ISO_FREQ[-1]), 150)
+    high = np.logspace(np.log10(12800.0), np.log10(EXTRAP_HIGH_HZ), 20)
+    return low, in_band, high
+
+
+def build_target(level, ref_level, scale=1.0):
+    """Fit target over the full design grid, with flat-held extrapolation.
+
+    Returns:
+        tuple: (grid, target, in_band_slice) where ``in_band_slice`` selects the
+        ISO-backed portion that the minimax objective minimizes over.
+    """
+    low, in_band, high = design_grid()
+    delta = ideal_delta(level, ref_level, scale)
+    t_low = np.full(len(low), delta[0])
+    t_in = np.interp(np.log10(in_band), np.log10(ISO_FREQ), delta)
+    t_high = np.full(len(high), delta[-1])
+    grid = np.concatenate([low, in_band, high])
+    target = np.concatenate([t_low, t_in, t_high])
+    return grid, target, slice(len(low), len(low) + len(in_band))
 
 
 def get_biquad_coefs(ftype, fc, fs, gain, q):
-    """Generates biquad coefficients based on Robert Bristow-Johnson's Audio EQ Cookbook.
+    """Biquad coefficients per Robert Bristow-Johnson's Audio EQ Cookbook.
 
     Args:
-        ftype (str): Filter type, one of 'Peak', 'Low Shelf', or 'High Shelf'.
-        fc (float): Center frequency in Hz.
+        ftype (str): One of 'Peak', 'Low Shelf', or 'High Shelf'.
+        fc (float): Centre or corner frequency in Hz.
         fs (float): Sampling frequency in Hz.
         gain (float): Gain in dB.
         q (float): Q-factor.
 
     Returns:
-        tuple: lists of feedforward (b) and feedback (a) coefficients.
+        tuple: feedforward (b) and feedback (a) coefficient lists.
     """
-    a_val = 10 ** (gain / 40.0)
-    w0 = 2 * np.pi * fc / fs
-    alpha = np.sin(w0) / (2 * q)
-
     if gain == 0:
         return [1.0, 0.0, 0.0], [1.0, 0.0, 0.0]
 
-    b0, b1, b2 = 0.0, 0.0, 0.0
-    a0, a1, a2 = 1.0, 0.0, 0.0
+    a_val = 10 ** (gain / 40.0)
+    w0 = 2 * np.pi * fc / fs
+    alpha = np.sin(w0) / (2 * q)
 
     if ftype == 'Peak':
         b0 = 1 + alpha * a_val
@@ -101,7 +222,7 @@ def get_biquad_coefs(ftype, fc, fs, gain, q):
     elif ftype == 'High Shelf':
         b0 = a_val * ((a_val + 1) + (a_val - 1) * np.cos(w0) + 2 * np.sqrt(a_val) * alpha)
         b1 = -2 * a_val * ((a_val - 1) + (a_val + 1) * np.cos(w0))
-        b2 = a_val * ((a_val + 1) - (a_val - 1) * np.cos(w0) - 2 * np.sqrt(a_val) * alpha)
+        b2 = a_val * ((a_val + 1) + (a_val - 1) * np.cos(w0) - 2 * np.sqrt(a_val) * alpha)
         a0 = (a_val + 1) - (a_val - 1) * np.cos(w0) + 2 * np.sqrt(a_val) * alpha
         a1 = 2 * ((a_val - 1) - (a_val + 1) * np.cos(w0))
         a2 = (a_val + 1) - (a_val - 1) * np.cos(w0) - 2 * np.sqrt(a_val) * alpha
@@ -111,17 +232,18 @@ def get_biquad_coefs(ftype, fc, fs, gain, q):
     return [b0 / a0, b1 / a0, b2 / a0], [1.0, a1 / a0, a2 / a0]
 
 
-def get_filter_response(filters, frequencies, fs=48000):
-    """Calculates the combined frequency response in dB of a cascade of filters.
+def get_filter_response(filters, frequencies, fs=DESIGN_FS):
+    """Combined magnitude response in dB of a cascade of filters.
 
     Args:
-        filters (list): List of filter parameters tuples (ftype, fc, gain, q).
-        frequencies (np.ndarray): Frequencies to evaluate the response at.
-        fs (float): Sampling frequency in Hz. Defaults to 48000.
+        filters (list): Tuples of (ftype, fc, gain, q).
+        frequencies (np.ndarray): Frequencies to evaluate at.
+        fs (float): Sampling frequency in Hz. Defaults to DESIGN_FS (44.1 kHz).
 
     Returns:
         np.ndarray: Response in dB.
     """
+    frequencies = np.asarray(frequencies, dtype=float)
     w_eval = 2 * np.pi * frequencies / fs
     total_h = np.ones(len(frequencies), dtype=complex)
     for filt in filters:
@@ -129,3 +251,15 @@ def get_filter_response(filters, frequencies, fs=48000):
         _, h = freqz(b, a, worN=w_eval)
         total_h *= h
     return 20 * np.log10(np.abs(total_h))
+
+
+def peak_gain(filters, rates=VERIFY_RATES):
+    """Worst-case peak gain (dB) of a filter cascade across sample rates.
+
+    Biquad responses warp near Nyquist, so a shelf near the top of the audio
+    band realizes a different gain at 44.1 kHz than at 192 kHz. The published
+    headroom figure must cover the worst of them.
+    """
+    grid = np.logspace(np.log10(20.0), np.log10(20000.0), 3000)
+    return max(float(np.max(get_filter_response(filters, grid, fs)))
+               for fs in rates)

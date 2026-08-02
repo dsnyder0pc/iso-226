@@ -141,13 +141,18 @@ cython_debug/
 .DS_Store
 Thumbs.db
 
-# Equal-Loudness compensation PEQ generated files
-filter-*db.md
-filter-*db.png
-filter-*db.yml
-!images/filter-*db.png
-!REW/filter-*db.yml
+# Equal-Loudness compensation PEQ generated files.
+# Anchored to the repo root with a leading slash, so the curated copies under
+# images/ and REW/ stay tracked without needing negations.
+/filter_*.md
+/filter_*.png
+/filter_*.yml
 
-# Filter Error Plots
-iso_226_filter_error_for_*db.png
-!images/iso_226_filter_error_for_*db.png
+# Legacy names from before presets encoded reference and scale.
+/filter-*db.md
+/filter-*db.png
+/filter-*db.yml
+/iso_226_filter_error_for_*db.png
+
+# Reference PDFs — ISO previews are copyright-protected; keep local, do not commit
+reference/

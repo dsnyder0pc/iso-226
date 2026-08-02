@@ -1,0 +1,19 @@
+"""Template for the ISO 226:2023 Annex B verification fixture.
+
+The strongest test in this suite -- `test_matches_published_annex_b` -- compares
+Formula (1) against contour values published in the standard itself. Those values
+are not redistributable, so they are not committed here.
+
+To enable the test, copy this file to `reference/annex_b_2023.py` and fill in the
+40 phon row of Annex B, Table B.1 from your own copy of ISO 226:2023, in order at
+the 29 ISO 266 preferred frequencies from 20 Hz to 12.5 kHz.
+
+Without it the test skips; every other test still runs. A correct implementation
+agrees with Table B.1 to within 0.05 dB, which is that table's printed precision.
+"""
+
+ANNEX_B_40_PHON = [
+    # 20 Hz, 25, 31.5, 40, 50, 63, 80, 100, 125, 160,
+    # 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600,
+    # 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500
+]

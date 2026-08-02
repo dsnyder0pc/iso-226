@@ -1,0 +1,77 @@
+# Equal-Loudness Compensation EQ for 80 dB
+# Mastering reference: 83 dB  (default) · listening level: 80 dB · scale: 1.00
+# Headroom adjustment: -1.6 dB (apply as negative preamp gain)
+# Designed at 44.1 kHz.
+# Bands 1-5 are a complete correction on their own (max error 0.0218 dB);
+# bands 6-10 refine it to 0.0197 dB.
+filters:
+  band_1:
+    type: Biquad
+    parameters:
+      type: Lowshelf
+      freq: 38.2
+      gain: 2.62
+      q: 0.27
+  band_2:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 240.8
+      gain: 0.18
+      q: 0.56
+  band_3:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 967.6
+      gain: -0.0
+      q: 0.31
+  band_4:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 2822.1
+      gain: -0.11
+      q: 0.43
+  band_5:
+    type: Biquad
+    parameters:
+      type: Highshelf
+      freq: 9889.9
+      gain: 0.48
+      q: 0.89
+  band_6:
+    type: Biquad
+    parameters:
+      type: Lowshelf
+      freq: 38.9
+      gain: 0.0
+      q: 1.17
+  band_7:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 152.6
+      gain: 0.01
+      q: 0.39
+  band_8:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 496.9
+      gain: -0.0
+      q: 0.25
+  band_9:
+    type: Biquad
+    parameters:
+      type: Peaking
+      freq: 1816.7
+      gain: 0.0
+      q: 0.25
+  band_10:
+    type: Biquad
+    parameters:
+      type: Highshelf
+      freq: 7825.4
+      gain: -0.0
+      q: 1.87
