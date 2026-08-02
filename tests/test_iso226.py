@@ -14,6 +14,8 @@ import sys
 import numpy as np
 import pytest
 
+# The repo root must be on sys.path before the project modules import.
+# pylint: disable=wrong-import-position
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from iso226_utils import (  # noqa: E402
@@ -66,6 +68,7 @@ def test_target_is_zero_at_1khz():
 
 
 def test_target_vanishes_when_level_equals_reference():
+    """At the mastering level there is nothing to correct."""
     assert np.max(np.abs(ideal_delta(83.0, 83.0))) < 1e-9
 
 
@@ -76,6 +79,7 @@ def test_target_boosts_bass_below_reference_and_cuts_above():
 
 
 def test_scale_is_linear():
+    """--scale multiplies the target, so it must scale the curve linearly."""
     full = ideal_delta(65.0, 83.0)
     half = ideal_delta(65.0, 83.0, scale=0.5)
     assert np.allclose(half, full * 0.5)
@@ -106,18 +110,21 @@ def test_level_error_matters_far_more_than_convention():
 # --- Biquads ----------------------------------------------------------------
 
 def test_zero_gain_is_transparent():
+    """A 0 dB band must be exactly transparent, not merely close."""
     freqs = np.logspace(np.log10(20), np.log10(20000), 64)
     resp = get_filter_response([('Peak', 1000.0, 0.0, 1.0)], freqs)
     assert np.max(np.abs(resp)) < 1e-9
 
 
 def test_low_shelf_approaches_its_gain_at_dc():
+    """Well below its corner a low shelf must reach its nominal gain."""
     resp = get_filter_response([('Low Shelf', 100.0, 6.0, 0.7)],
                                np.array([1.0]))[0]
     assert abs(resp - 6.0) < 0.1
 
 
 def test_low_shelf_passband_is_flat():
+    """Well above its corner a low shelf must be transparent."""
     resp = get_filter_response([('Low Shelf', 100.0, 6.0, 0.7)],
                                np.array([15000.0]))[0]
     assert abs(resp) < 0.05
@@ -140,6 +147,7 @@ def test_high_shelf_passband_is_flat_at_every_rate(fs, gain):
 
 @pytest.mark.parametrize('fs', VERIFY_RATES)
 def test_high_shelf_reaches_its_gain_above_the_corner(fs):
+    """Well above its corner a high shelf must reach its nominal gain."""
     resp = get_filter_response([('High Shelf', 2000.0, 6.0, 0.7)],
                                np.array([fs / 2.0 * 0.98]), fs)[0]
     assert abs(resp - 6.0) < 0.3
@@ -157,6 +165,7 @@ def test_shelves_never_overshoot_their_own_gain():
 
 
 def test_cascade_is_additive_in_db():
+    """Cascaded filters multiply in magnitude, so they add in dB."""
     freqs = np.logspace(np.log10(20), np.log10(20000), 64)
     a = ('Peak', 200.0, 3.0, 1.0)
     b = ('High Shelf', 8000.0, -2.0, 0.7)
@@ -166,24 +175,18 @@ def test_cascade_is_additive_in_db():
 
 
 def test_unknown_filter_type_is_rejected():
+    """An unrecognised type must raise rather than silently do nothing."""
     with pytest.raises(ValueError):
         get_filter_response([('Notch', 1000.0, 3.0, 1.0)], np.array([1000.0]))
 
 
-def test_cascade_diagnostics_flag_a_cancelling_pair():
+def test_cascade_diagnostics_flag_a_cancelling_pair(lf):
     """The conditioning metrics must actually detect the degenerate case.
 
     Two large opposing filters at nearly the same frequency measure fine
     end-to-end but overflow intermediate nodes in serial fixed-point DSPs and
     lose their cancellation under host coefficient quantization.
     """
-    import importlib.util
-    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    spec = importlib.util.spec_from_file_location(
-        "lf", os.path.join(here, "loudness-filters.py"))
-    lf = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(lf)
-
     healthy = [('Low Shelf', 77.5, 10.39, 0.42), ('Peak', 321.0, 2.39, 0.25),
                ('Peak', 771.1, -1.78, 0.36), ('Peak', 5482.0, -0.62, 0.59),
                ('High Shelf', 10921.3, 4.45, 0.68)]
@@ -202,6 +205,7 @@ def test_cascade_diagnostics_flag_a_cancelling_pair():
 
 
 def test_peak_gain_covers_every_verified_rate():
+    """The published peak must bound the response at every verified rate."""
     filters = [('High Shelf', 10000.0, 4.0, 0.7)]
     worst = peak_gain(filters)
     grid = np.logspace(np.log10(20), np.log10(20000), 500)

@@ -16,12 +16,14 @@ import numpy as np
 import pytest
 import yaml
 
+# The repo root must be on sys.path before the project modules import.
+# pylint: disable=wrong-import-position
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from check import parse_markdown_filters, parse_markdown_metadata  # noqa: E402
 from iso226_utils import (  # noqa: E402
-    EXTRAP_TOLERANCE_DB, ISO_FREQ, VERIFY_RATES, build_target,
-    get_filter_response, ideal_delta,
+    EXTRAP_TOLERANCE_DB, VERIFY_RATES, build_target, get_filter_response,
+    ideal_delta,
 )
 
 # A hand-built result standing in for a generated one, so the format tests stay
@@ -73,6 +75,7 @@ def test_metadata_round_trips(lf, tmp_path, ref, scale):
 
 
 def test_yaml_is_loadable_and_maps_every_band(lf, tmp_path):
+    """Every band must survive as valid CamillaDSP YAML, with types mapped."""
     path = tmp_path / "filter_83_to_65_s1.0.yml"
     lf.write_camilladsp_yaml(SYNTHETIC, 65.0, 83.0, 1.0, -9.5, str(path))
 
@@ -110,6 +113,7 @@ def test_headroom_is_rounded_away_from_zero(lf):
 
 
 def test_headroom_is_zero_when_nothing_is_boosted(lf):
+    """A set that only cuts needs no attenuation."""
     quiet = {'essential': [('Low Shelf', 60.0, -3.0, 0.7)],
              'all': [('Low Shelf', 60.0, -3.0, 0.7)]}
     assert lf.headroom_adjustment(quiet) == 0.0
@@ -138,16 +142,19 @@ def test_suggestions_actually_fit_the_budget(lf):
 
 
 def test_no_suggestions_when_the_request_already_fits(lf):
+    """Do not tell someone to change parameters that are already fine."""
     scale, level = lf.suggest_alternatives(75.0, 83.0, 1.0)
     assert scale is None
     assert level is None
 
 
 def test_budget_check_passes_a_reachable_target(lf):
+    """A target inside the gain budget must not raise."""
     lf.check_budget(SYNTHETIC, 65.0, 83.0, 1.0)  # must not raise
 
 
 def test_budget_check_rejects_an_unreachable_target(lf):
+    """Over budget must refuse, and must name a usable alternative."""
     huge = {'essential': [('Low Shelf', 60.0, 12.0, 0.7)] * 3,
             'refinement': [], 'error_essential': 0.05, 'error_all': 0.05}
     huge['all'] = huge['essential']
@@ -167,7 +174,7 @@ def test_preset_is_nested(lf, preset):
 @pytest.mark.slow
 def test_preset_respects_the_host_gain_limit(lf, preset):
     """Roon's PEQ gain control stops at +/-12 dB; miniDSP at +/-16."""
-    for ftype, fc, gain, q_val in preset['all']:
+    for _, _, gain, _ in preset['all']:
         assert abs(gain) <= lf.MAX_BAND_GAIN
 
 
@@ -190,7 +197,7 @@ def test_preset_is_well_conditioned(lf, preset):
 
 
 @pytest.mark.slow
-def test_preset_meets_its_advertised_error(lf, preset):
+def test_preset_meets_its_advertised_error(preset):
     """The published error must be measured from the published, rounded values."""
     grid, target, in_band = build_target(65.0, 83.0, 1.0)
     for filters, claimed in ((preset['essential'], preset['error_essential']),
@@ -202,7 +209,7 @@ def test_preset_meets_its_advertised_error(lf, preset):
 
 
 @pytest.mark.slow
-def test_preset_extrapolation_stays_bounded(lf, preset):
+def test_preset_extrapolation_stays_bounded(preset):
     """Outside the ISO data the fit is constrained, not left to its own devices."""
     grid, target, in_band = build_target(65.0, 83.0, 1.0)
     error = get_filter_response(preset['all'], grid) - target
@@ -211,7 +218,7 @@ def test_preset_extrapolation_stays_bounded(lf, preset):
 
 
 @pytest.mark.slow
-def test_preset_has_no_band_above_12khz(lf, preset):
+def test_preset_has_no_band_above_12khz(preset):
     """ISO 226 stops at 12.5 kHz and shelves near Nyquist are rate-sensitive."""
     assert max(f[1] for f in preset['all']) <= 12000.0
 

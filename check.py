@@ -15,6 +15,12 @@ import re
 import subprocess
 import sys
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+# Two deliberate departures from import-at-the-top: the path setup above has to
+# run first, and matplotlib's backend must be chosen before pyplot loads.
+# pylint: disable=wrong-import-position
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -22,10 +28,8 @@ import numpy as np
 
 from iso226_utils import DESIGN_FS, ISO_FREQ, get_filter_response, ideal_delta
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 _spec = importlib.util.spec_from_file_location(
-    "_lf", os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "loudness-filters.py"))
+    "_lf", os.path.join(HERE, "loudness-filters.py"))
 _lf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_lf)
 preset_stem = _lf.preset_stem

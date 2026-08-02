@@ -22,11 +22,11 @@ import os
 import sys
 import time
 
-import numpy as np
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+# sys.path must be set up before the project modules can be imported.
+# pylint: disable=wrong-import-position
 from iso226_utils import ISO_FREQ, get_filter_response, ideal_delta  # noqa: E402
 
 
@@ -103,6 +103,7 @@ def generate(level, with_figures):
 
 
 def main():
+    """Regenerate every preset, or list what would be generated."""
     parser = argparse.ArgumentParser(
         description="Regenerate every committed preset and figure.")
     parser.add_argument("--list", action="store_true",

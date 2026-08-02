@@ -74,9 +74,11 @@ MIN_SPACING_RATIO = 1.7
 # within the per-band gain budget and the request should be refused.
 FIT_ERROR_LIMIT_DB = 1.0
 
+
 def _progress(message, end="\n"):
     """Progress to stderr, so stdout stays usable for piping the tables."""
     print(message, end=end, file=sys.stderr, flush=True)
+
 
 # --- Filter topology --------------------------------------------------------
 # Both tiers span the full spectrum. Treble compensation belongs in the
@@ -571,6 +573,11 @@ def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
 
 def plot_frequency_response(result, level, ref_level, scale, headroom, filename):
     """Plot essential-only and full responses against the ideal target."""
+    # Imported lazily and deliberately: matplotlib costs about a second to
+    # import, and nothing else in this module needs it. Hoisting it to the top
+    # would slow every CLI invocation, including the ones that only print a
+    # table or fail validation.
+    # pylint: disable=import-outside-toplevel
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt

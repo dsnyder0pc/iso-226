@@ -17,6 +17,7 @@ sys.path.insert(0, REPO_ROOT)
 
 
 def pytest_configure(config):
+    """Register the markers this suite uses."""
     config.addinivalue_line(
         "markers",
         "slow: runs the optimizer (~30 s each); deselect with -m 'not slow'",
@@ -59,6 +60,9 @@ def lf():
     return module
 
 
+# Requesting one fixture from another necessarily shadows its name; that is the
+# pytest idiom, not an accident.
+# pylint: disable=redefined-outer-name
 @pytest.fixture(scope="session")
 def preset(lf):
     """One real generated filter set, shared by every slow test.
