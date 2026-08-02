@@ -250,6 +250,23 @@ The verification plot below shows the residual deviation error across standard p
 
 ---
 
+## License and third-party content
+
+The software is MIT licensed — see [LICENSE](LICENSE).
+
+That licence covers this project's own code. It does **not** cover the ISO 226
+Table 1 coefficients reproduced in `iso226_utils.py`, which belong to ISO and
+are not mine to sub-license. ISO confirmed on 1 August 2026 that reproducing
+Table 1 requires explicit permission; a request is currently with ANSI, the ISO
+member body for the United States. If permission is refused the coefficients
+will be removed. See [NOTICE](NOTICE) for the details.
+
+This project is not a substitute for the standard. Anyone doing serious work
+with equal-loudness contours should [buy
+it](https://www.iso.org/standard/83117.html).
+
+---
+
 ## References
 
 *   **ISO 226:2003 Standard**: *Acoustics — Normal equal-loudness-level contours*. International Organization for Standardization. [ISO 226:2003 Specification](https://www.iso.org/standard/34222.html). (Third edition, ISO 226:2023, updated the 20 Hz hearing threshold; see [ISO 226:2023](https://www.iso.org/standard/83117.html).)

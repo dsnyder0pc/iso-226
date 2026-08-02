@@ -151,3 +151,11 @@ filter-*db.yml
 # Filter Error Plots
 iso_226_filter_error_for_*db.png
 !images/iso_226_filter_error_for_*db.png
+
+# Reference PDFs and Annex B verification data — ISO material, not redistributable
+reference/
+
+# Preset output using the reference-to-level naming scheme
+/filter_*.md
+/filter_*.png
+/filter_*.yml
