@@ -487,6 +487,12 @@ doing serious work with equal-loudness contours should buy it.
 paywall-exclusive, it is not needed to *run* anything, and it is used only to
 check the implementation — so it is supplied locally by whoever owns a copy.
 
+The software is MIT licensed (see `LICENSE`). That licence covers the code, not
+ISO's coefficients, which are not mine to sub-license — see `NOTICE`. ISO
+confirmed on 1 August 2026 that reproducing Table 1 requires explicit
+permission, and a request is currently with ANSI, the US member body. If it is
+refused the coefficients will be removed and `NOTICE` updated accordingly.
+
 Note that ISO's own free preview does **not** include Table 1; it covers the
 Foreword, Introduction, Scope, normative references and terms only. The
 coefficients are also visible in the ISO/PRF 226 draft preview redistributed by

@@ -1,0 +1,43 @@
+THIRD-PARTY CONTENT NOTICE
+==========================
+
+The MIT licence in LICENSE covers the software in this repository -- the
+filter-design code, the tests, the documentation and the generated presets.
+
+It does NOT and CANNOT cover the following, which is not mine to license.
+
+
+ISO 226:2023, Table 1
+---------------------
+
+The per-frequency coefficients in `iso226_utils.py` (`ISO_AF`, `ISO_LU` and
+`ISO_TF`, 29 values each) are reproduced from Table 1 of
+
+    ISO 226:2023, Acoustics -- Normal equal-loudness-level contours
+    (c) International Organization for Standardization
+
+They are reproduced because ISO 226 Formula (1) cannot be evaluated without
+them: with those coefficients removed the software has no function.
+
+**Permission for this reproduction has been requested and is pending.** ISO
+customer service confirmed on 1 August 2026 that reproducing Table 1 requires
+explicit permission or a licensing agreement, and that such permissions are
+handled by the national ISO member body -- ANSI in the United States. A request
+is with ANSI. If permission is refused, these coefficients will be removed and
+this notice updated to say so.
+
+Nothing else from the standard is reproduced here beyond short quotations of
+the Scope and of the stated range of validity of Formula (1). Annex B is
+deliberately excluded: it is used only to verify this implementation, the values
+are not in this repository, and the test that uses them is disabled unless a
+user supplies them from their own copy of the standard.
+
+**This project is not a substitute for the standard.** Anyone doing serious work
+with equal-loudness contours should buy it: https://www.iso.org/standard/83117.html
+
+
+ISO 266
+-------
+
+`ISO_FREQ` is the preferred one-third-octave frequency series of ISO 266,
+included so the coefficients above are correctly indexed.
