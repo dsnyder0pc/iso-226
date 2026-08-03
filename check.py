@@ -29,7 +29,10 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
-from iso226_utils import DESIGN_FS, ISO_FREQ, get_filter_response, ideal_delta
+from iso226_utils import (
+    DEFAULT_REFERENCE, DEFAULT_SCALE, DESIGN_FS, ISO_FREQ, Compensation,
+    get_filter_response, ideal_delta,
+)
 
 _spec = importlib.util.spec_from_file_location(
     "_lf", os.path.join(HERE, "loudness-filters.py"))
@@ -40,9 +43,6 @@ preset_stem = _lf.preset_stem
 # Imported rather than restated: the band count is part of the file format this
 # module parses, so the two must not be able to drift apart.
 BAND_COUNT = _lf.BAND_COUNT
-
-DEFAULT_REFERENCE = 83.0
-DEFAULT_SCALE = 1.0
 
 
 def parse_markdown_filters(filepath):
@@ -82,30 +82,31 @@ def parse_markdown_metadata(filepath):
     return ref, scale
 
 
-def ensure_filter_file(level, ref, scale, md_filename):
+def ensure_filter_file(comp, md_filename):
     """Generate the filter table if it is not already present.
 
-    The filename now encodes the reference and scale, so there is no ambiguity
-    to resolve: a missing file simply means that combination has not been
+    The filename encodes the reference and scale, so there is no ambiguity to
+    resolve: a missing file simply means that combination has not been
     generated yet.
     """
     if os.path.exists(md_filename):
         recorded_ref, recorded_scale = parse_markdown_metadata(md_filename)
-        if recorded_ref != ref or recorded_scale != scale:
+        if recorded_ref != comp.reference or recorded_scale != comp.scale:
             print(f"Warning: '{md_filename}' records reference "
                   f"{recorded_ref} dB / scale {recorded_scale}, but its name "
-                  f"says {ref} dB / {scale}. Regenerating.")
+                  f"says {comp.reference} dB / {comp.scale}. Regenerating.")
         else:
             return
 
     print(f"Generating {md_filename} using loudness-filters.py...")
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'loudness-filters.py')
-    subprocess.run([sys.executable, script, '--level', str(level),
-                    '--reference', str(ref), '--scale', str(scale)], check=True)
+    subprocess.run([sys.executable, script, '--level', str(comp.level),
+                    '--reference', str(comp.reference),
+                    '--scale', str(comp.scale)], check=True)
 
 
-def plot_residual_error(err, level, ref, scale, filename):
+def plot_residual_error(err, comp, filename):
     """Plot residual error for the published band set."""
     max_err = float(np.max(np.abs(err)))
 
@@ -115,11 +116,12 @@ def plot_residual_error(err, level, ref, scale, filename):
                  label=f'Published filter set (max {max_err:.4f} dB)')
     plt.axhline(0, color='black', linestyle='--', alpha=0.7)
 
-    level_str = f"{int(level)}" if float(level).is_integer() else f"{level}"
+    level_str = (f"{int(comp.level)}" if float(comp.level).is_integer()
+                 else f"{comp.level}")
     title = ('Residual Error Relative to the Ideal ISO 226 Target\n'
-             f'listening at {level_str} dB, mastered for {ref:g} dB'
-             + (' (default)' if ref == DEFAULT_REFERENCE else '')
-             + (f', scale {scale:.2f}' if scale != 1.0 else '')
+             f'listening at {level_str} dB, mastered for {comp.reference:g} dB'
+             + (' (default)' if comp.reference == DEFAULT_REFERENCE else '')
+             + (f', scale {comp.scale:.2f}' if comp.scale != DEFAULT_SCALE else '')
              + f' · evaluated at {DESIGN_FS / 1000:.1f} kHz')
     plt.title(title)
     plt.xlabel('Frequency (Hz)')
@@ -149,22 +151,27 @@ def main():
                              f'(default: {DEFAULT_SCALE:g})')
     args = parser.parse_args()
 
-    ref, scale = args.reference, args.scale
-    stem = preset_stem(args.level, ref, scale)
+    try:
+        comp = Compensation(args.level, args.reference, args.scale)
+    except ValueError as err:
+        print(f"Error: {err}", file=sys.stderr)
+        return 1
+    stem = preset_stem(comp)
     md_filename = f"{stem}.md"
     plot_filename = f"{stem}_error.png"
 
     try:
-        ensure_filter_file(args.level, ref, scale, md_filename)
+        ensure_filter_file(comp, md_filename)
     except subprocess.CalledProcessError:
         return 1
 
     filters = parse_markdown_filters(md_filename)
-    if not filters and ref == args.level:
+    if not filters and comp.is_null:
         # The generator writes prose instead of a table when the listening level
         # equals the mastering reference: the ideal correction is identically
         # zero, so there is nothing to fit and nothing to verify.
-        print(f"Listening level equals the mastering reference ({ref:g} dB), so "
+        print("Listening level equals the mastering reference "
+              f"({comp.reference:g} dB), so "
               "the ideal correction is 0.00 dB at every frequency.")
         print("No filters to verify.")
         return 0
@@ -177,13 +184,13 @@ def main():
         print(f"Warning: '{md_filename}' publishes {len(filters)} bands, but the "
               f"generator now produces {BAND_COUNT}. Verifying the file as it is.")
 
-    target = ideal_delta(args.level, ref, scale)
+    target = ideal_delta(comp)
     err = get_filter_response(filters, ISO_FREQ) - target
     max_err = float(np.max(np.abs(err)))
     print(f"Max residual error, {len(filters)} bands as published: "
           f"{max_err:.4f} dB")
 
-    plot_residual_error(err, args.level, ref, scale, plot_filename)
+    plot_residual_error(err, comp, plot_filename)
     return 0
 
 

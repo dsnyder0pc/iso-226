@@ -15,6 +15,10 @@ import pytest
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
+# The repo root must be on sys.path before the project modules import.
+# pylint: disable=wrong-import-position
+from iso226_utils import Compensation  # noqa: E402
+
 
 def pytest_configure(config):
     """Register the markers this suite uses."""
@@ -70,4 +74,4 @@ def preset(lf):
     Generating a preset takes ~30 s, so the integration tests assert many
     properties of a single run rather than paying that cost repeatedly.
     """
-    return lf.calculate_filters(65.0, 83.0)
+    return lf.calculate_filters(Compensation(65.0, 83.0))

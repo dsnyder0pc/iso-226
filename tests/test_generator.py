@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from check import parse_markdown_filters, parse_markdown_metadata  # noqa: E402
 from iso226_utils import (  # noqa: E402
-    EXTRAP_TOLERANCE_DB, VERIFY_RATES, build_target, get_filter_response,
-    ideal_delta,
+    EXTRAP_TOLERANCE_DB, VERIFY_RATES, Compensation, build_target,
+    get_filter_response, ideal_delta,
 )
 
 # A hand-built result standing in for a generated one, so the format tests stay
@@ -45,7 +45,7 @@ SYNTHETIC = {
 def test_markdown_round_trips_through_check(lf, tmp_path):
     """Every band written must come back with identical values, in order."""
     path = tmp_path / "filter_83_to_65_s1.0.md"
-    lf.write_markdown_table(SYNTHETIC, 65.0, 83.0, 1.0, -9.5, str(path))
+    lf.write_markdown_table(SYNTHETIC, Compensation(65.0), -9.5, str(path))
 
     recovered = parse_markdown_filters(str(path))
     assert len(recovered) == len(SYNTHETIC['filters'])
@@ -59,7 +59,7 @@ def test_markdown_round_trips_through_check(lf, tmp_path):
 def test_markdown_publishes_every_band_in_order(lf, tmp_path):
     """check.py reads the table positionally, so row order is load-bearing."""
     path = tmp_path / "filter_83_to_65_s1.0.md"
-    lf.write_markdown_table(SYNTHETIC, 65.0, 83.0, 1.0, -9.5, str(path))
+    lf.write_markdown_table(SYNTHETIC, Compensation(65.0), -9.5, str(path))
     recovered = parse_markdown_filters(str(path))
     assert recovered == [(f[0], f[1], f[2], f[3]) for f in SYNTHETIC['filters']]
 
@@ -78,7 +78,7 @@ def test_frequency_survives_rendering_without_exponent_or_trailing_zero(lf,
                        ('Peak', 2910.0, 1.0, 0.5),
                        ('High Shelf', 12000.0, 1.0, 0.5)]
     path = tmp_path / "filter_83_to_65_s1.0.md"
-    lf.write_markdown_table(wide, 65.0, 83.0, 1.0, -9.5, str(path))
+    lf.write_markdown_table(wide, Compensation(65.0), -9.5, str(path))
     text = path.read_text()
     assert "| 38.67 |" in text and "| 262.6 |" in text
     assert "| 900 |" in text and "| 2910 |" in text and "| 12000 |" in text
@@ -91,14 +91,15 @@ def test_frequency_survives_rendering_without_exponent_or_trailing_zero(lf,
 def test_metadata_round_trips(lf, tmp_path, ref, scale):
     """check.py regenerates when these disagree, so they must survive writing."""
     path = tmp_path / "filter_83_to_65_s1.0.md"
-    lf.write_markdown_table(SYNTHETIC, 65.0, ref, scale, -9.5, str(path))
+    lf.write_markdown_table(SYNTHETIC, Compensation(65.0, ref, scale), -9.5,
+                            str(path))
     assert parse_markdown_metadata(str(path)) == (ref, scale)
 
 
 def test_yaml_is_loadable_and_maps_every_band(lf, tmp_path):
     """Every band must survive as valid CamillaDSP YAML, with types mapped."""
     path = tmp_path / "filter_83_to_65_s1.0.yml"
-    lf.write_camilladsp_yaml(SYNTHETIC, 65.0, 83.0, 1.0, -9.5, str(path))
+    lf.write_camilladsp_yaml(SYNTHETIC, Compensation(65.0), -9.5, str(path))
 
     loaded = yaml.safe_load(path.read_text())
     bands = loaded['filters']
@@ -118,7 +119,7 @@ def test_yaml_is_loadable_and_maps_every_band(lf, tmp_path):
 def test_yaml_records_the_headroom(lf, tmp_path):
     """The headroom lives only in a comment, so it is easy to lose silently."""
     path = tmp_path / "filter_83_to_65_s1.0.yml"
-    lf.write_camilladsp_yaml(SYNTHETIC, 65.0, 83.0, 1.0, -9.5, str(path))
+    lf.write_camilladsp_yaml(SYNTHETIC, Compensation(65.0), -9.5, str(path))
     assert "-9.5 dB" in path.read_text()
 
 
@@ -150,31 +151,31 @@ def test_headroom_prevents_clipping_at_every_verified_rate(lf):
 
 def test_suggestions_actually_fit_the_budget(lf):
     """A suggestion the user cannot use is worse than no suggestion."""
-    scale, level = lf.suggest_alternatives(50.0, 83.0, 1.0)
+    scale, level = lf.suggest_alternatives(Compensation(50.0))
     budget = lf.MAX_HEADROOM
     assert scale is not None and scale < 1.0
-    assert np.max(np.abs(ideal_delta(50.0, 83.0, scale))) <= budget
+    assert np.max(np.abs(ideal_delta(Compensation(50.0, scale=scale)))) <= budget
     assert level is not None and level > 50.0
-    assert np.max(np.abs(ideal_delta(level, 83.0, 1.0))) <= budget
+    assert np.max(np.abs(ideal_delta(Compensation(level)))) <= budget
 
 
 def test_no_suggestions_when_the_request_already_fits(lf):
     """Do not tell someone to change parameters that are already fine."""
-    scale, level = lf.suggest_alternatives(75.0, 83.0, 1.0)
+    scale, level = lf.suggest_alternatives(Compensation(75.0))
     assert scale is None
     assert level is None
 
 
 def test_budget_check_passes_a_reachable_target(lf):
     """A target inside the gain budget must not raise."""
-    lf.check_budget(SYNTHETIC, 65.0, 83.0, 1.0)  # must not raise
+    lf.check_budget(SYNTHETIC, Compensation(65.0))  # must not raise
 
 
 def test_budget_check_rejects_an_unreachable_target(lf):
     """Over budget must refuse, and must name a usable alternative."""
     huge = {'filters': [('Low Shelf', 60.0, 12.0, 0.7)] * 3, 'error': 0.05}
     with pytest.raises(ValueError, match="--scale|--level"):
-        lf.check_budget(huge, 50.0, 83.0, 1.0)
+        lf.check_budget(huge, Compensation(50.0))
 
 
 # --- Publication precision (fast) -------------------------------------------
@@ -249,7 +250,7 @@ def test_preset_respects_the_total_gain_budget(lf, preset):
     Nothing downstream re-checks it, so if the search ever accepted an
     unconverged point this is what would catch it.
     """
-    _, target, in_band = build_target(65.0, 83.0, 1.0)
+    _, target, in_band = build_target(Compensation(65.0))
     budget = lf.GAIN_BUDGET_FACTOR * float(np.ptp(target[in_band]))
     assert sum(abs(f[2]) for f in preset['filters']) <= budget + 1e-6
 
@@ -282,7 +283,7 @@ def test_preset_is_well_conditioned(lf, preset):
 @pytest.mark.slow
 def test_preset_meets_its_advertised_error(preset):
     """The published error must be measured from the published, rounded values."""
-    grid, target, in_band = build_target(65.0, 83.0, 1.0)
+    grid, target, in_band = build_target(Compensation(65.0))
     actual = np.max(np.abs(
         (get_filter_response(preset['filters'], grid) - target)[in_band]))
     assert actual == pytest.approx(preset['error'], abs=1e-6)
@@ -292,7 +293,7 @@ def test_preset_meets_its_advertised_error(preset):
 @pytest.mark.slow
 def test_preset_extrapolation_stays_bounded(preset):
     """Outside the ISO data the fit is constrained, not left to its own devices."""
-    grid, target, in_band = build_target(65.0, 83.0, 1.0)
+    grid, target, in_band = build_target(Compensation(65.0))
     error = get_filter_response(preset['filters'], grid) - target
     outside = np.concatenate([error[:in_band.start], error[in_band.stop:]])
     assert np.max(np.abs(outside)) <= EXTRAP_TOLERANCE_DB + 1e-6

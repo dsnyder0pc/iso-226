@@ -8,6 +8,8 @@ every alpha_f in Table 1; the two editions are not interchangeable.
 
 import importlib.util
 import os
+from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
 from scipy.signal import freqz
@@ -133,6 +135,70 @@ EXTRAP_LOW_HZ = 10.0
 EXTRAP_HIGH_HZ = 20000.0
 EXTRAP_TOLERANCE_DB = 1.5
 
+# ---------------------------------------------------------------------------
+# What defines one preset
+# ---------------------------------------------------------------------------
+# The compensation curve is a property of the *pair* of levels, not of either
+# alone, and `scale` is the fraction of it applied. These three travel together
+# through everything -- target construction, fitting, refusal messages,
+# filenames, all three writers -- so they are one value rather than three
+# parameters repeated in a fixed order.
+DEFAULT_REFERENCE = 83.0
+DEFAULT_SCALE = 1.0
+
+MIN_LEVEL, MAX_LEVEL = 50.0, 90.0
+MIN_REFERENCE, MAX_REFERENCE = 70.0, 90.0
+MIN_SCALE, MAX_SCALE = 0.1, 1.0
+
+
+@dataclass(frozen=True)
+class Compensation:
+    """A validated (level, reference, scale) triple: one compensation curve.
+
+    ``level`` is *measured* in the room, broadband and C-weighted.
+    ``reference`` is a property of the *recording* -- the level it was mastered
+    to sound correct at. They are not interchangeable, and passing one where the
+    other belongs is the mistake this type exists to make hard.
+
+    Frozen, and validated once at construction, so nothing downstream has to
+    re-check a range or worry about a caller mutating it mid-fit.
+    """
+
+    level: float
+    reference: float = DEFAULT_REFERENCE
+    scale: float = DEFAULT_SCALE
+
+    def __post_init__(self):
+        if not MIN_LEVEL <= self.level <= MAX_LEVEL:
+            raise ValueError(
+                f"Target listening level ({self.level} dB) must be between "
+                f"{MIN_LEVEL} and {MAX_LEVEL} dB SPL.")
+        if not MIN_REFERENCE <= self.reference <= MAX_REFERENCE:
+            raise ValueError(
+                f"Reference (mastering) level ({self.reference} dB) must be "
+                f"between {MIN_REFERENCE} and {MAX_REFERENCE} dB SPL.")
+        if not MIN_SCALE <= self.scale <= MAX_SCALE:
+            raise ValueError(
+                f"Scale ({self.scale}) must be between {MIN_SCALE} and "
+                f"{MAX_SCALE}.")
+
+    @property
+    def is_null(self):
+        """True when the listener is already at the mastering reference."""
+        return self.level == self.reference
+
+
+class FitTarget(NamedTuple):
+    """The design grid, the target on it, and the ISO-backed span to fit over.
+
+    A NamedTuple rather than a dataclass so the three can still be unpacked
+    positionally where that reads better than attribute access.
+    """
+
+    grid: np.ndarray
+    target: np.ndarray
+    in_band: slice
+
 
 def iso226_spl(phon, f_arr=None):
     """Sound pressure level (dB SPL) for a given loudness level, per ISO 226.
@@ -179,7 +245,7 @@ def iso226_spl(phon, f_arr=None):
     return (10.0 / af) * np.log10(a_f) - lu
 
 
-def ideal_delta(level, ref_level, scale=1.0):
+def ideal_delta(comp):
     """The equal-loudness compensation target at the ISO preferred frequencies.
 
     The difference in contour *shape* between the listening level and the
@@ -188,21 +254,19 @@ def ideal_delta(level, ref_level, scale=1.0):
     Because this is a difference of two contours, a systematic offset shared by
     both levels -- such as reading broadband C-weighted SPL rather than the
     loudness level of an equally loud 1 kHz tone -- cancels to first order.
-    What matters is that ``level`` and ``ref_level`` are measured the same way.
+    What matters is that the two levels are measured the same way.
 
     Args:
-        level (float): Listening level, in dB SPL as measured in the room.
-        ref_level (float): Level the recording was mastered to sound correct at.
-        scale (float): Fraction of the theoretical correction to apply.
+        comp (Compensation): The listening level, mastering reference and scale.
 
     Returns:
         np.ndarray: Target gain in dB at each ISO_FREQ.
     """
-    target_spl = iso226_spl(level)
-    ref_spl = iso226_spl(ref_level)
+    target_spl = iso226_spl(comp.level)
+    ref_spl = iso226_spl(comp.reference)
     delta = ((target_spl - target_spl[REF_1KHZ_INDEX])
              - (ref_spl - ref_spl[REF_1KHZ_INDEX]))
-    return delta * scale
+    return delta * comp.scale
 
 
 def design_grid():
@@ -218,21 +282,28 @@ def design_grid():
     return low, in_band, high
 
 
-def build_target(level, ref_level, scale=1.0):
+def build_target(comp):
     """Fit target over the full design grid, with flat-held extrapolation.
 
+    Args:
+        comp (Compensation): The listening level, mastering reference and scale.
+
     Returns:
-        tuple: (grid, target, in_band_slice) where ``in_band_slice`` selects the
-        ISO-backed portion that the minimax objective minimizes over.
+        FitTarget: ``grid``, ``target`` and the ``in_band`` slice selecting the
+        ISO-backed portion that the minimax objective minimizes over. It is a
+        NamedTuple, so ``grid, target, in_band = build_target(comp)`` still
+        works where the three are wanted separately.
     """
     low, in_band, high = design_grid()
-    delta = ideal_delta(level, ref_level, scale)
+    delta = ideal_delta(comp)
     t_low = np.full(len(low), delta[0])
     t_in = np.interp(np.log10(in_band), np.log10(ISO_FREQ), delta)
     t_high = np.full(len(high), delta[-1])
-    grid = np.concatenate([low, in_band, high])
-    target = np.concatenate([t_low, t_in, t_high])
-    return grid, target, slice(len(low), len(low) + len(in_band))
+    return FitTarget(
+        grid=np.concatenate([low, in_band, high]),
+        target=np.concatenate([t_low, t_in, t_high]),
+        in_band=slice(len(low), len(low) + len(in_band)),
+    )
 
 
 def get_biquad_coefs(ftype, fc, fs, gain, q):

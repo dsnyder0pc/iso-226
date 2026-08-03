@@ -21,8 +21,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import iso226_utils  # noqa: E402
 from iso226_utils import (  # noqa: E402
     ALPHA_R, ANNEX_B_TOLERANCE_DB, ISO226_PHON_MAX, ISO226_PHON_MIN, ISO_AF,
-    ISO_FREQ, ISO_TF, REF_1KHZ_INDEX, T_R, VERIFY_RATES, get_filter_response,
-    ideal_delta, iso226_spl, peak_gain,
+    ISO_FREQ, ISO_TF, REF_1KHZ_INDEX, T_R, VERIFY_RATES, Compensation,
+    get_filter_response, ideal_delta, iso226_spl, peak_gain,
 )
 
 
@@ -116,28 +116,57 @@ def test_coefficients_interpolate_in_log_frequency():
     assert min(lower, upper) <= mid <= max(lower, upper)
 
 
+# --- The Compensation bundle ------------------------------------------------
+
+@pytest.mark.parametrize("kwargs,expected", [
+    ({"level": 40.0}, "listening level"),
+    ({"level": 95.0}, "listening level"),
+    ({"level": 74.0, "reference": 60.0}, "Reference"),
+    ({"level": 74.0, "reference": 95.0}, "Reference"),
+    ({"level": 74.0, "scale": 0.0}, "Scale"),
+    ({"level": 74.0, "scale": 1.5}, "Scale"),
+])
+def test_compensation_validates_at_construction(kwargs, expected):
+    """Validating once, at the boundary, is the point of bundling these."""
+    with pytest.raises(ValueError, match=expected):
+        Compensation(**kwargs)
+
+
+def test_compensation_is_frozen():
+    """Nothing may mutate a curve's definition partway through a fit."""
+    comp = Compensation(74.0)
+    with pytest.raises(Exception):
+        comp.level = 80.0
+
+
+def test_compensation_knows_when_there_is_nothing_to_correct():
+    """At the mastering reference the ideal correction is identically zero."""
+    assert Compensation(83.0, 83.0).is_null
+    assert not Compensation(74.0, 83.0).is_null
+
+
 # --- The compensation target ------------------------------------------------
 
 def test_target_is_zero_at_1khz():
     """Every compensation curve is normalized to 0 dB at 1 kHz."""
-    assert abs(ideal_delta(65.0, 83.0)[REF_1KHZ_INDEX]) < 1e-9
+    assert abs(ideal_delta(Compensation(65.0, 83.0))[REF_1KHZ_INDEX]) < 1e-9
 
 
 def test_target_vanishes_when_level_equals_reference():
     """At the mastering level there is nothing to correct."""
-    assert np.max(np.abs(ideal_delta(83.0, 83.0))) < 1e-9
+    assert np.max(np.abs(ideal_delta(Compensation(83.0, 83.0)))) < 1e-9
 
 
 def test_target_boosts_bass_below_reference_and_cuts_above():
     """Below the mastering level bass needs lifting; above it, trimming."""
-    assert ideal_delta(65.0, 83.0)[0] > 0
-    assert ideal_delta(88.0, 83.0)[0] < 0
+    assert ideal_delta(Compensation(65.0, 83.0))[0] > 0
+    assert ideal_delta(Compensation(88.0, 83.0))[0] < 0
 
 
 def test_scale_is_linear():
     """--scale multiplies the target, so it must scale the curve linearly."""
-    full = ideal_delta(65.0, 83.0)
-    half = ideal_delta(65.0, 83.0, scale=0.5)
+    full = ideal_delta(Compensation(65.0, 83.0))
+    half = ideal_delta(Compensation(65.0, 83.0, 0.5))
     assert np.allclose(half, full * 0.5)
 
 
@@ -149,17 +178,17 @@ def test_measurement_convention_offset_cancels():
     an offset common to both cancels to first order -- which is what lets a
     listener use an ordinary SPL meter instead of a calibrated tone.
     """
-    base = ideal_delta(65.0, 83.0)
+    base = ideal_delta(Compensation(65.0, 83.0))
     for offset in (2.0, 4.0, 6.0, 7.0):
-        shifted = ideal_delta(65.0 + offset, 83.0 + offset)
+        shifted = ideal_delta(Compensation(65.0 + offset, 83.0 + offset))
         assert np.max(np.abs(shifted - base)) < 0.1
 
 
 def test_level_error_matters_far_more_than_convention():
     """Mis-measuring the level is the dominant error source, by ~50x."""
-    base = ideal_delta(65.0, 83.0)
-    convention = np.max(np.abs(ideal_delta(71.0, 89.0) - base))
-    level = np.max(np.abs(ideal_delta(71.0, 83.0) - base))
+    base = ideal_delta(Compensation(65.0, 83.0))
+    convention = np.max(np.abs(ideal_delta(Compensation(71.0, 89.0)) - base))
+    level = np.max(np.abs(ideal_delta(Compensation(71.0, 83.0)) - base))
     assert level > 20 * convention
 
 

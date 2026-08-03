@@ -18,23 +18,18 @@ anyone to type filters that do nothing.
 import argparse
 import sys
 import time
+from dataclasses import replace
 
 import numpy as np
 import yaml
 from scipy.optimize import minimize
 
 from iso226_utils import (
-    DESIGN_FS, EXTRAP_TOLERANCE_DB, ISO_FREQ, VERIFY_RATES,
-    build_target, get_filter_response, ideal_delta, peak_gain,
+    DEFAULT_REFERENCE, DEFAULT_SCALE, DESIGN_FS, EXTRAP_TOLERANCE_DB, ISO_FREQ,
+    MAX_LEVEL, MAX_SCALE, MIN_LEVEL, MIN_REFERENCE, MAX_REFERENCE, MIN_SCALE,
+    VERIFY_RATES, Compensation, build_target, get_filter_response, ideal_delta,
+    peak_gain,
 )
-
-# --- Parameter bounds -------------------------------------------------------
-MIN_LEVEL = 50.0
-MAX_LEVEL = 90.0
-MIN_REFERENCE = 70.0
-MAX_REFERENCE = 90.0
-MIN_SCALE = 0.1
-MAX_SCALE = 1.0
 
 # Roon's MUSE Parametric EQ gain control spans +12 to -12 dB; miniDSP allows
 # +/-16 dB, so 12 dB satisfies both. This bounds the per-band gain we may ask
@@ -156,24 +151,6 @@ BAND_COUNT = len(BAND_TYPES)
 MIN_Q, MAX_Q = 0.25, 2.0
 
 
-def validate_parameters(target_level, ref_level, scale=1.0):
-    """Validate the requested levels and scale against their allowed ranges."""
-    if not MIN_LEVEL <= target_level <= MAX_LEVEL:
-        raise ValueError(
-            f"Target listening level ({target_level} dB) must be between "
-            f"{MIN_LEVEL} and {MAX_LEVEL} dB SPL."
-        )
-    if not MIN_REFERENCE <= ref_level <= MAX_REFERENCE:
-        raise ValueError(
-            f"Reference (mastering) level ({ref_level} dB) must be between "
-            f"{MIN_REFERENCE} and {MAX_REFERENCE} dB SPL."
-        )
-    if not MIN_SCALE <= scale <= MAX_SCALE:
-        raise ValueError(
-            f"Scale ({scale}) must be between {MIN_SCALE} and {MAX_SCALE}."
-        )
-
-
 def _sigfig(value, digits):
     """Round to a fixed number of significant figures."""
     if value == 0:
@@ -215,100 +192,139 @@ def _restart_point(attempt, rng, seeds, bounds):
                      for v, (lo, hi) in zip(values, bounds)])
 
 
-def _fit_bands(types, fc_bounds, grid, target, in_band, gain_budget, seed=0):
-    """Search for the published band set with the smallest rounded error.
+class _Objective:
+    """Error and constraints for one band layout against one fit target.
 
-    Each attempt is solved in epigraph form -- minimize t subject to
+    Kept apart from the multistart loop because they are separate concerns:
+    this knows about filters and the ISO target, the loop knows about restarts.
+
+    The problem is posed in epigraph form -- minimize t subject to
     |error| <= t -- rather than by handing max(abs(error)) to a gradient
     optimizer. The maximum of absolute values is not differentiable at its
     optimum, which is exactly where the solver spends its time; the epigraph
-    form is smooth and converges properly.
+    form is smooth and converges properly. The parameter vector is therefore
+    ``[gains, freqs, qs, t]``.
 
     In-band error drives the objective. Outside the ISO data range the error is
-    merely constrained, so the extrapolation stays bounded without consuming
-    the accuracy budget where the standard actually has evidence. Total absolute
-    gain is capped by ``gain_budget`` to rule out large offsetting band pairs.
+    merely constrained, so the extrapolation stays bounded without consuming the
+    accuracy budget where the standard actually has evidence. Total absolute
+    gain is capped to rule out large offsetting band pairs.
+    """
 
-    SLSQP is a local method and this problem is not convex, so the fit is a
-    multistart: each attempt solves from a different starting point and the best
-    survives. Two rules make running the search longer monotonically safe, which
-    the target-driven loop depends on:
+    def __init__(self, types, fc_bounds, fit, gain_budget):
+        self.types = types
+        self.n = len(types)
+        self.fit = fit
+        self.gain_budget = gain_budget
+        self.seeds = [float(np.sqrt(lo * hi)) for lo, hi in fc_bounds]
+        self.bounds = (
+            [(-MAX_BAND_GAIN, MAX_BAND_GAIN)] * self.n
+            + list(fc_bounds)
+            + [(MIN_Q, MAX_Q)] * self.n
+        )
+
+    def unpack(self, p):
+        """Parameter vector -> (type, fc, gain, q) tuples."""
+        n = self.n
+        return [(self.types[i], p[n + i], p[i], p[2 * n + i]) for i in range(n)]
+
+    def error(self, p):
+        """Signed deviation from the target across the whole design grid."""
+        return get_filter_response(
+            self.unpack(p), self.fit.grid, DESIGN_FS) - self.fit.target
+
+    def in_band_error(self, p):
+        """Worst deviation inside the ISO-backed span -- the fit objective."""
+        return float(np.max(np.abs(self.error(p)[self.fit.in_band])))
+
+    def published_error(self, filters):
+        """Error of already-rounded filters -- what the reader actually gets."""
+        response = get_filter_response(filters, self.fit.grid, DESIGN_FS)
+        return float(np.max(np.abs(
+            (response - self.fit.target)[self.fit.in_band])))
+
+    def constraint(self, p):
+        """Inequality vector for SLSQP; every entry must stay non-negative.
+
+        Epigraph bounds on the in-band error, the extrapolation tolerance
+        outside it, the total gain budget, and the minimum spacing between
+        consecutive bands.
+        """
+        n, in_band = self.n, self.fit.in_band
+        err = self.error(p)
+        oob = np.concatenate([err[:in_band.start], err[in_band.stop:]])
+        freqs = p[n:2 * n]
+        return np.concatenate([
+            p[3 * n] - err[in_band],
+            p[3 * n] + err[in_band],
+            EXTRAP_TOLERANCE_DB - np.abs(oob),
+            [self.gain_budget - np.sum(np.abs(p[:n]))],
+            freqs[1:] - MIN_SPACING_RATIO * freqs[:-1],
+        ])
+
+    def feasible(self, x):
+        """Whether a returned point actually satisfies every constraint.
+
+        SLSQP can exit without converging and hand back a point that fits well
+        in band while breaking the gain budget or the extrapolation bound.
+        Nothing downstream re-checks those, so they are checked here.
+        """
+        return bool(np.min(self.constraint(x)) >= -CONSTRAINT_TOLERANCE)
+
+
+def _solve_once(obj, start):
+    """One SLSQP solve from ``start``.
+
+    Returns the published (rounded) filters and their error, or None if the
+    solve did not converge or landed outside the feasible region.
+    """
+    x0 = np.concatenate([start, [obj.in_band_error(start)]])
+    result = minimize(
+        lambda p: p[3 * obj.n], x0, method='SLSQP',
+        bounds=obj.bounds + [(0.0, 60.0)],
+        constraints=[{'type': 'ineq', 'fun': obj.constraint}],
+        options={'maxiter': 300, 'ftol': 1e-9},
+    )
+    if not result.success or not obj.feasible(result.x):
+        return None
+    filters = publication_round(obj.unpack(result.x[:3 * obj.n]))
+    return filters, obj.published_error(filters)
+
+
+def _fit_bands(types, fc_bounds, fit, gain_budget, seed=0):
+    """Multistart search for the published band set with the smallest error.
+
+    SLSQP is a local method and this problem is not convex, so each attempt
+    solves from a different starting point and the best survives. Two rules make
+    running the search longer monotonically safe, which the target-driven exit
+    depends on:
 
       * an attempt is scored on its PUBLISHED error, so the winner is whichever
         set is best *after* rounding. Scoring on the raw fit lets an attempt win
         that is better before rounding and worse after -- which is not
         hypothetical: it made the 62 dB preset 16% worse (0.0986 -> 0.1140 dB)
         when the restart count was raised.
-      * an attempt is discarded unless SLSQP reports convergence and the point
-        it returns satisfies every constraint. Nothing downstream re-checks the
-        gain budget or the extrapolation bound, so an unconverged point that
-        happened to fit well in band would otherwise be published.
+      * an attempt is discarded unless it converged and is feasible.
 
     Returns:
         dict with 'filters' (rounded), 'error' (published), the number of
         'restarts' spent and whether 'target_met'.
     """
-    n = len(types)
-    seeds = [float(np.sqrt(lo * hi)) for lo, hi in fc_bounds]
-    bounds = (
-        [(-MAX_BAND_GAIN, MAX_BAND_GAIN)] * n
-        + list(fc_bounds)
-        + [(MIN_Q, MAX_Q)] * n
-    )
-
-    def unpack(p):
-        return [(types[i], p[n + i], p[i], p[2 * n + i]) for i in range(n)]
-
-    def error(p):
-        return get_filter_response(unpack(p), grid, DESIGN_FS) - target
-
-    def in_band_error(p):
-        return float(np.max(np.abs(error(p)[in_band])))
-
-    def published_error(filters):
-        response = get_filter_response(filters, grid, DESIGN_FS)
-        return float(np.max(np.abs((response - target)[in_band])))
-
-    def constraint(p):
-        err = error(p)
-        oob = np.concatenate([err[:in_band.start], err[in_band.stop:]])
-        freqs = p[n:2 * n]
-        spacing = freqs[1:] - MIN_SPACING_RATIO * freqs[:-1]
-        return np.concatenate([
-            p[3 * n] - err[in_band],
-            p[3 * n] + err[in_band],
-            EXTRAP_TOLERANCE_DB - np.abs(oob),
-            [gain_budget - np.sum(np.abs(p[:n]))],
-            spacing,
-        ])
-
+    obj = _Objective(types, fc_bounds, fit, gain_budget)
     rng = np.random.default_rng(seed)
     best_error, best_filters = np.inf, None
     since_improved, attempt = 0, 0
 
     for attempt in range(1, MAX_RESTARTS + 1):
-        start = _restart_point(attempt, rng, seeds, bounds)
-        x0 = np.concatenate([start, [in_band_error(start)]])
-
-        result = minimize(
-            lambda p: p[3 * n], x0, method='SLSQP',
-            bounds=bounds + [(0.0, 60.0)],
-            constraints=[{'type': 'ineq', 'fun': constraint}],
-            options={'maxiter': 300, 'ftol': 1e-9},
-        )
-        improved = False
-        feasible = (result.success
-                    and np.min(constraint(result.x)) >= -CONSTRAINT_TOLERANCE)
-        if feasible:
-            candidate = publication_round(unpack(result.x[:3 * n]))
-            value = published_error(candidate)
-            if value < best_error:
-                best_error, best_filters, improved = value, candidate, True
+        found = _solve_once(
+            obj, _restart_point(attempt, rng, obj.seeds, obj.bounds))
+        improved = found is not None and found[1] < best_error
+        if improved:
+            best_filters, best_error = found
         since_improved = 0 if improved else since_improved + 1
 
-        met_target = (best_error <= PUBLISHED_ERROR_TARGET_DB
-                      and attempt >= MIN_RESTARTS)
-        if met_target or since_improved >= STAGNATION_LIMIT:
+        if ((best_error <= PUBLISHED_ERROR_TARGET_DB and attempt >= MIN_RESTARTS)
+                or since_improved >= STAGNATION_LIMIT):
             break
 
     if best_filters is None:
@@ -323,22 +339,22 @@ def _fit_bands(types, fc_bounds, grid, target, in_band, gain_budget, seed=0):
     }
 
 
-def calculate_filters(target_level, ref_level, scale=1.0):
-    """Fit the published filter set for a listening level.
+def calculate_filters(comp):
+    """Fit the published filter set for one compensation curve.
+
+    Args:
+        comp (Compensation): The listening level, mastering reference and scale.
 
     Returns:
         dict with 'filters' rounded to publication precision, the 'error' those
         published values actually achieve, the number of 'restarts' spent and
         whether 'target_met'.
     """
-    validate_parameters(target_level, ref_level, scale)
-    grid, target, in_band = build_target(target_level, ref_level, scale)
+    fit = build_target(comp)
+    gain_budget = GAIN_BUDGET_FACTOR * float(np.ptp(fit.target[fit.in_band]))
 
-    span = float(np.ptp(target[in_band]))
-    gain_budget = GAIN_BUDGET_FACTOR * span
-
-    _progress(f"Fitting listening level {_level_str(target_level)} dB against a "
-              f"{ref_level:g} dB reference, scale {scale:.2f}.")
+    _progress(f"Fitting listening level {_level_str(comp.level)} dB against a "
+              f"{comp.reference:g} dB reference, scale {comp.scale:.2f}.")
     # No time estimate: this is a constrained minimax with multistart, and how
     # long it takes depends both on the machine and on how quickly the search
     # reaches its target. Elapsed time and restarts spent are reported after
@@ -346,8 +362,7 @@ def calculate_filters(target_level, ref_level, scale=1.0):
     _progress(f"  multistart to a {PUBLISHED_ERROR_TARGET_DB:g} dB published "
               f"target, up to {MAX_RESTARTS} restarts ...", end=" ")
     started = time.perf_counter()
-    result = _fit_bands(BAND_TYPES, BAND_FC_BOUNDS, grid, target, in_band,
-                        gain_budget, seed=3)
+    result = _fit_bands(BAND_TYPES, BAND_FC_BOUNDS, fit, gain_budget, seed=3)
     _progress(f"done ({time.perf_counter() - started:.1f} s, "
               f"{result['restarts']} restarts)")
 
@@ -425,7 +440,7 @@ def cascade_diagnostics(filters, trials=32, seed=11):
 SUGGESTION_MARGIN_DB = 0.5
 
 
-def suggest_alternatives(target_level, ref_level, scale):
+def suggest_alternatives(comp):
     """Compute a scale and a listening level that would fit the 12 dB budget.
 
     Estimated from the size of the *target* curve rather than from the peak of
@@ -434,37 +449,39 @@ def suggest_alternatives(target_level, ref_level, scale):
     would make both suggestions needlessly conservative.
     """
     budget = MAX_HEADROOM - SUGGESTION_MARGIN_DB
-    peak_target = float(np.max(np.abs(ideal_delta(target_level, ref_level, scale))))
+    peak_target = float(np.max(np.abs(ideal_delta(comp))))
 
     suggested_scale = None
     if peak_target > 0:
-        raw = scale * budget / peak_target
+        raw = comp.scale * budget / peak_target
         suggested_scale = float(np.floor(raw * 20.0) / 20.0)
         suggested_scale = max(MIN_SCALE, min(MAX_SCALE, suggested_scale))
-        if suggested_scale >= scale:
+        if suggested_scale >= comp.scale:
             suggested_scale = None
 
     # Find the quietest listening level whose target still fits the budget.
     suggested_level = None
     already_fits = peak_target <= budget
-    lo, hi = target_level, min(ref_level, MAX_LEVEL)
-    reachable = float(np.max(np.abs(ideal_delta(hi, ref_level, scale)))) <= budget
+    lo, hi = comp.level, min(comp.reference, MAX_LEVEL)
+    reachable = float(np.max(np.abs(
+        ideal_delta(replace(comp, level=hi))))) <= budget
     if not already_fits and reachable:
         for _ in range(60):
             mid = (lo + hi) / 2.0
-            if float(np.max(np.abs(ideal_delta(mid, ref_level, scale)))) > budget:
+            if float(np.max(np.abs(
+                    ideal_delta(replace(comp, level=mid))))) > budget:
                 lo = mid
             else:
                 hi = mid
         # Bisection converges from above, so nudge before rounding up: without
         # this a level that already fits comes back one dB higher than itself.
         suggested_level = float(np.ceil(hi - 1e-6))
-        if suggested_level <= target_level:
+        if suggested_level <= comp.level:
             suggested_level = None
     return suggested_scale, suggested_level
 
 
-def check_budget(result, target_level, ref_level, scale):
+def check_budget(result, comp):
     """Raise a ValueError with actionable suggestions if the set cannot be used."""
     peak = peak_gain(result['filters'])
     max_gain = max(abs(f[2]) for f in result['filters'])
@@ -480,10 +497,10 @@ def check_budget(result, target_level, ref_level, scale):
         f"the correction needs more than {MAX_BAND_GAIN:.0f} dB in a single band "
         f"(best achievable error {result['error']:.2f} dB)"
     )
-    sug_scale, sug_level = suggest_alternatives(target_level, ref_level, scale)
+    sug_scale, sug_level = suggest_alternatives(comp)
     lines = [
-        f"Cannot build a usable filter set for --level {target_level:g} "
-        f"--reference {ref_level:g}: {reason}.",
+        f"Cannot build a usable filter set for --level {comp.level:g} "
+        f"--reference {comp.reference:g}: {reason}.",
         f"  (largest single band gain in this fit: {max_gain:.2f} dB)",
         "",
         "Try one of:",
@@ -494,14 +511,11 @@ def check_budget(result, target_level, ref_level, scale):
     if sug_level is not None:
         lines.append(f"  --level {sug_level:g}       target a higher listening level")
     lines.append(f"  --reference <lower>  if this recording is mastered quieter "
-                 f"than {ref_level:g} dB")
+                 f"than {comp.reference:g} dB")
     raise ValueError("\n".join(lines))
 
 
 # --- Output -----------------------------------------------------------------
-
-DEFAULT_REFERENCE = 83.0
-
 
 def _level_str(level):
     return f"{int(level)}" if float(level).is_integer() else f"{level}"
@@ -513,15 +527,15 @@ def _scale_str(scale):
     return text if "." in text else f"{text}.0"
 
 
-def preset_stem(level, ref_level, scale):
+def preset_stem(comp):
     """Filename stem encoding what a preset actually is.
 
     A compensation curve is defined by the *pair* of levels, not by the
     listening level alone, so the reference belongs in the name. Scale is
     included so taste variants sit alongside each other without collision.
     """
-    return (f"filter_{_level_str(ref_level)}_to_{_level_str(level)}"
-            f"_s{_scale_str(scale)}")
+    return (f"filter_{_level_str(comp.reference)}_to_{_level_str(comp.level)}"
+            f"_s{_scale_str(comp.scale)}")
 
 
 def _freq_str(fc):
@@ -558,15 +572,15 @@ def is_null_correction(result):
     return all(abs(f[2]) < HOST_GAIN_PRECISION_DB / 2 for f in result['filters'])
 
 
-def write_markdown_table(result, level, ref_level, scale, headroom, filename):
+def write_markdown_table(result, comp, headroom, filename):
     """Write the two-tier PEQ table."""
     if is_null_correction(result):
         content = "\n".join([
-            f"### No Compensation Needed at {_level_str(level)} dB",
+            f"### No Compensation Needed at {_level_str(comp.level)} dB",
             "",
-            f"*Mastering reference {ref_level:g} dB"
-            + (" (default)" if ref_level == DEFAULT_REFERENCE else "")
-            + f" · listening level {_level_str(level)} dB · scale {scale:.2f}*",
+            f"*Mastering reference {comp.reference:g} dB"
+            + (" (default)" if comp.reference == DEFAULT_REFERENCE else "")
+            + f" · listening level {_level_str(comp.level)} dB · scale {comp.scale:.2f}*",
             "",
             "You are listening at the level this recording was mastered for, so "
             "there is nothing to correct: the ideal equal-loudness compensation "
@@ -587,12 +601,12 @@ def write_markdown_table(result, level, ref_level, scale, headroom, filename):
         return
 
     lines = [
-        f"### Equal-Loudness Compensation EQ for {_level_str(level)} dB",
+        f"### Equal-Loudness Compensation EQ for {_level_str(comp.level)} dB",
         "",
-        f"*Mastering reference {ref_level:g} dB"
-        + (" (default)" if ref_level == DEFAULT_REFERENCE else "")
-        + f" · listening level {_level_str(level)} dB"
-        + f" · scale {scale:.2f} · designed at {DESIGN_FS / 1000:.1f} kHz*",
+        f"*Mastering reference {comp.reference:g} dB"
+        + (" (default)" if comp.reference == DEFAULT_REFERENCE else "")
+        + f" · listening level {_level_str(comp.level)} dB"
+        + f" · scale {comp.scale:.2f} · designed at {DESIGN_FS / 1000:.1f} kHz*",
         "",
         f"**Headroom adjustment: {headroom:.1f} dB.** Apply this as a negative "
         "preamp / headroom setting. It is the worst case across "
@@ -614,7 +628,7 @@ def write_markdown_table(result, level, ref_level, scale, headroom, filename):
     print(f"Saved PEQ table to: {filename}")
 
 
-def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
+def write_camilladsp_yaml(result, comp, headroom, filename):
     """Write the band set as a CamillaDSP YAML file for direct REW import."""
     type_map = {LOW_SHELF: 'Lowshelf', HIGH_SHELF: 'Highshelf', PEAK: 'Peaking'}
     filters = {}
@@ -631,9 +645,9 @@ def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
 
     if is_null_correction(result):
         header = [
-            f"# No compensation needed at {_level_str(level)} dB.",
+            f"# No compensation needed at {_level_str(comp.level)} dB.",
             f"# Listening level equals the mastering reference "
-            f"({ref_level:g} dB), so the ideal correction is 0.00 dB at every",
+            f"({comp.reference:g} dB), so the ideal correction is 0.00 dB at every",
             "# frequency. Apply no filters and no headroom adjustment.",
             "# The bands below are all zero-gain and are included only so this",
             "# file is a valid, loadable CamillaDSP configuration.",
@@ -641,10 +655,10 @@ def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
         ]
     else:
         header = [
-            f"# Equal-Loudness Compensation EQ for {_level_str(level)} dB",
-            f"# Mastering reference: {ref_level:g} dB"
-            + ("  (default)" if ref_level == DEFAULT_REFERENCE else "")
-            + f" · listening level: {_level_str(level)} dB · scale: {scale:.2f}",
+            f"# Equal-Loudness Compensation EQ for {_level_str(comp.level)} dB",
+            f"# Mastering reference: {comp.reference:g} dB"
+            + ("  (default)" if comp.reference == DEFAULT_REFERENCE else "")
+            + f" · listening level: {_level_str(comp.level)} dB · scale: {comp.scale:.2f}",
             f"# Headroom adjustment: {headroom:.1f} dB "
             f"(apply as negative preamp gain)",
             f"# Designed at {DESIGN_FS / 1000:.1f} kHz.",
@@ -658,7 +672,7 @@ def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
     print(f"Saved CamillaDSP YAML file to: {filename}")
 
 
-def plot_frequency_response(result, level, ref_level, scale, headroom, filename):
+def plot_frequency_response(result, comp, headroom, filename):
     """Plot the published response against the ideal target."""
     # Imported lazily and deliberately: matplotlib costs about a second to
     # import, and nothing else in this module needs it. Hoisting it to the top
@@ -672,7 +686,7 @@ def plot_frequency_response(result, level, ref_level, scale, headroom, filename)
     freqs = np.logspace(np.log10(20), np.log10(20000), 2000)
     response = get_filter_response(result['filters'], freqs) + headroom
     target = np.interp(np.log10(freqs), np.log10(ISO_FREQ),
-                       ideal_delta(level, ref_level, scale)) + headroom
+                       ideal_delta(comp)) + headroom
 
     plt.figure(figsize=(12, 6))
     plt.semilogx(freqs, target, color='#7f7f7f', linewidth=3, alpha=0.45,
@@ -689,10 +703,10 @@ def plot_frequency_response(result, level, ref_level, scale, headroom, filename)
                 label='Beyond ISO 226 data (extrapolated)')
 
     plt.title(
-        f'Equal-Loudness PEQ Compensation — listening at {_level_str(level)} dB, '
-        f'mastered for {ref_level:g} dB'
-        + (' (default)' if ref_level == DEFAULT_REFERENCE else '')
-        + (f', scale {scale:.2f}' if scale != 1.0 else '') + '\n'
+        f'Equal-Loudness PEQ Compensation — listening at {_level_str(comp.level)} dB, '
+        f'mastered for {comp.reference:g} dB'
+        + (' (default)' if comp.reference == DEFAULT_REFERENCE else '')
+        + (f', scale {comp.scale:.2f}' if comp.scale != 1.0 else '') + '\n'
         f'Headroom adjustment {headroom:.1f} dB · designed at '
         f'{DESIGN_FS / 1000:.1f} kHz'
     )
@@ -724,15 +738,16 @@ def main():
     parser.add_argument('--reference', type=float, default=DEFAULT_REFERENCE,
                         help=f'Level the recording was mastered for, in dB SPL '
                              f'(default: 83.0, range: {MIN_REFERENCE}-{MAX_REFERENCE})')
-    parser.add_argument('--scale', type=float, default=1.0,
+    parser.add_argument('--scale', type=float, default=DEFAULT_SCALE,
                         help=f'Fraction of the theoretical correction to apply '
-                             f'(default: 1.0, range: {MIN_SCALE}-{MAX_SCALE})')
+                             f'(default: {DEFAULT_SCALE:g}, range: '
+                             f'{MIN_SCALE}-{MAX_SCALE})')
     args = parser.parse_args()
 
     try:
-        validate_parameters(args.level, args.reference, args.scale)
-        result = calculate_filters(args.level, args.reference, args.scale)
-        check_budget(result, args.level, args.reference, args.scale)
+        comp = Compensation(args.level, args.reference, args.scale)
+        result = calculate_filters(comp)
+        check_budget(result, comp)
     except ValueError as err:
         print(f"Error: {err}", file=sys.stderr)
         return 1
@@ -745,13 +760,10 @@ def main():
           f"quantization sensitivity {diag['quantization_sensitivity']:.4f} dB, "
           f"opposing neighbours {diag['opposing_neighbours']:.2f} dB/octave")
 
-    stem = preset_stem(args.level, args.reference, args.scale)
-    write_markdown_table(result, args.level, args.reference, args.scale,
-                         headroom, f"{stem}.md")
-    write_camilladsp_yaml(result, args.level, args.reference, args.scale,
-                          headroom, f"{stem}.yml")
-    plot_frequency_response(result, args.level, args.reference, args.scale,
-                            headroom, f"{stem}.png")
+    stem = preset_stem(comp)
+    write_markdown_table(result, comp, headroom, f"{stem}.md")
+    write_camilladsp_yaml(result, comp, headroom, f"{stem}.yml")
+    plot_frequency_response(result, comp, headroom, f"{stem}.png")
     return 0
 
 

@@ -24,8 +24,8 @@ python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 python check.py --level <db> [--reference <db>] [--scale <s>]
 
 # Regression tests — run after touching any math
-python -m pytest tests/                  # all 70 (~30 s)
-python -m pytest tests/ -m "not slow"    # 59 fast ones (~2 s)
+python -m pytest tests/                  # all 78 (~30 s)
+python -m pytest tests/ -m "not slow"    # 67 fast ones (~1 s)
 
 # Rebuild every committed preset and figure (several minutes)
 python regenerate.py
@@ -60,15 +60,23 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
 ## Architecture
 
 - **`iso226_utils.py`** — all shared math.
+  - `Compensation(level, reference, scale)`: **the parameter bundle.** A frozen
+    dataclass, validated once in `__post_init__`, that defines one compensation
+    curve. It travels through target construction, fitting, refusal messages,
+    filenames and all three writers, so nothing downstream re-checks a range or
+    can transpose a level for a reference. Adding a fourth knob means adding a
+    field here, not a parameter to a dozen signatures. This is what the Flask
+    work should build from query parameters.
   - `iso226_spl(phon, f_arr)`: ISO 226:2023 Formula (1). Coefficients
     interpolate in **log** frequency. Raises outside 20–90 phon, the range the
     standard defines.
-  - `ideal_delta(level, ref, scale)`: the compensation target — difference of
-    two contours, normalized to 0 dB at 1 kHz (`REF_1KHZ_INDEX`), times `scale`.
-  - `build_target(...)`: returns `(grid, target, in_band_slice)`. The grid spans
-    10 Hz–20 kHz; the target is **held flat** outside 20 Hz–12.5 kHz where ISO
-    has no data. `in_band_slice` selects the ISO-backed region that the
-    optimizer's objective actually minimizes over.
+  - `ideal_delta(comp)`: the compensation target — difference of two contours,
+    normalized to 0 dB at 1 kHz (`REF_1KHZ_INDEX`), times `comp.scale`.
+  - `build_target(comp)`: returns a `FitTarget` NamedTuple of
+    `(grid, target, in_band)`. The grid spans 10 Hz–20 kHz; the target is
+    **held flat** outside 20 Hz–12.5 kHz where ISO has no data. `in_band`
+    selects the ISO-backed region the optimizer's objective minimizes over. It
+    is a NamedTuple so it still unpacks positionally where that reads better.
   - `get_biquad_coefs` / `get_filter_response`: RBJ Audio EQ Cookbook biquads,
     cascaded via `scipy.signal.freqz`. Default `fs` is `DESIGN_FS` = 44100.
   - `peak_gain(filters)`: worst peak across `VERIFY_RATES` (44.1/48/96/192 kHz).
@@ -78,32 +86,11 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     from `tests/annex_b_reference.py.example` by whoever owns the standard.
     Without them `test_matches_published_annex_b` skips.
 
-### ISO data — no ISO numbers live in this repository
-
-Two separate sets, both gitignored under `reference/`, both supplied by whoever
-holds the standard. Do not commit either, and do not "helpfully" inline values
-found in a paper, a Wikipedia table or another repository — provenance is the
-whole point.
-
-- **Table 1** (`reference/iso226_table1.py`, template
-  `tests/iso226_table1.py.example`) — `ISO_AF` / `ISO_LU` / `ISO_TF`, loaded by
-  `_load_table1()`. **Nothing runs without it**: no import, no tests, no
-  generator. That is the intended behaviour, not a bug to work around.
-  `ALPHA_R` and `T_R` are *derived* from its 1 kHz entries rather than restated,
-  so there is one source for each number.
-- **Annex B** (`reference/annex_b_2023.py`) — verification only; its absence
-  skips one test.
-
-`ISO_FREQ` (ISO 266 preferred frequencies) stays committed: it is the R10
-preferred-number series, needed to index the columns that are absent.
-
-The loader validates shape, not values — column lengths, plus `ISO_LU` being
-0.0 at 1 kHz, which is true by definition since `L_U` is specified relative to
-1 kHz. That catches a transcription off-by-one without this repo asserting any
-value it does not own.
-
 - **`loudness-filters.py`** — generator CLI.
-  - `_fit_bands(...)`: minimax fit in **epigraph form** (minimize `t` subject to
+  - `_Objective` / `_solve_once` / `_fit_bands`: three concerns kept apart —
+    what "error" and "feasible" mean for a band layout, one SLSQP solve, and the
+    multistart loop around it.
+  - `_Objective`: minimax fit in **epigraph form** (minimize `t` subject to
     `|error| <= t`). Do not "simplify" this back to handing `np.max(np.abs(...))`
     to SLSQP — that function is non-differentiable at the optimum and fits 3–5×
     worse.
@@ -151,6 +138,30 @@ value it does not own.
   columns *positionally*, and nothing else notices when one side of that
   contract changes.
 
+### ISO data — no ISO numbers live in this repository
+
+Two separate sets, both gitignored under `reference/`, both supplied by whoever
+holds the standard. Do not commit either, and do not "helpfully" inline values
+found in a paper, a Wikipedia table or another repository — provenance is the
+whole point.
+
+- **Table 1** (`reference/iso226_table1.py`, template
+  `tests/iso226_table1.py.example`) — `ISO_AF` / `ISO_LU` / `ISO_TF`, loaded by
+  `_load_table1()`. **Nothing runs without it**: no import, no tests, no
+  generator. That is the intended behaviour, not a bug to work around.
+  `ALPHA_R` and `T_R` are *derived* from its 1 kHz entries rather than restated,
+  so there is one source for each number.
+- **Annex B** (`reference/annex_b_2023.py`) — verification only; its absence
+  skips one test.
+
+`ISO_FREQ` (ISO 266 preferred frequencies) stays committed: it is the R10
+preferred-number series, needed to index the columns that are absent.
+
+The loader validates shape, not values — column lengths, plus `ISO_LU` being
+0.0 at 1 kHz, which is true by definition since `L_U` is specified relative to
+1 kHz. That catches a transcription off-by-one without this repo asserting any
+value it does not own.
+
 ## Code quality bar
 
 **pylint must reach 10.00/10.** Not "close enough" — the owner's standing
@@ -165,23 +176,22 @@ maintainability. When that applies:
 
 * disable the check **at the site**, with a comment saying why — never in a
   config file, and never a bare `# pylint: disable=` with no reasoning;
-* prefer restructuring over suppressing. Four functions currently exceed the
-  argument limit because `(level, reference, scale)` travels together through
-  seven of them; the answer is a small frozen parameter object, not a disable
-  comment.
+* prefer restructuring over suppressing. This worked: the `R0913` / `R0914`
+  findings that sat at 9.85 for a long time were pointing at a real design
+  problem, and were cleared by fixing it rather than silencing it. See
+  `Compensation` below.
 
 Existing documented exceptions, all deliberate: `wrong-import-position` where
 `sys.path` setup or matplotlib's backend selection must precede imports;
 `import-outside-toplevel` for the lazy matplotlib import, which costs about a
 second and is not needed by most invocations; `redefined-outer-name` in
 `conftest.py`, where one pytest fixture requesting another necessarily shadows
-the name.
+the name; `protected-access` in the Table 1 loader tests, which are testing the
+loader's contract.
 
-**Known gap:** the score is 9.85. The remaining findings are all `R0913` /
-`R0914` on the argument and local counts described above. They are left visible
-on purpose — suppressing them would hide the refactor they are pointing at.
-That refactor belongs with the Flask work, which needs the same validated
-parameter bundle from query parameters.
+**The score is 10.00.** Run the full command above — linting `tests/` on its own
+reports spurious `import-error`, because the repo root only lands on the path
+when the modules are linted together.
 
 **Any Bash added to this repo must pass `shellcheck -S style` cleanly.** There
 is essentially no excuse for a finding at that level; fix the script rather than

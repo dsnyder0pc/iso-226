@@ -27,7 +27,9 @@ sys.path.insert(0, HERE)
 
 # sys.path must be set up before the project modules can be imported.
 # pylint: disable=wrong-import-position
-from iso226_utils import ISO_FREQ, get_filter_response, ideal_delta  # noqa: E402
+from iso226_utils import (  # noqa: E402
+    ISO_FREQ, Compensation, get_filter_response, ideal_delta,
+)
 
 
 def _load(name, filename):
@@ -82,26 +84,26 @@ def _quiet(func, *args, **kwargs):
 
 def generate(level, with_figures):
     """Build one preset, install it in REW/, and optionally plot it."""
-    stem = lf.preset_stem(level, REFERENCE, SCALE)
+    comp = Compensation(float(level), REFERENCE, SCALE)
+    stem = lf.preset_stem(comp)
     started = time.perf_counter()
 
-    result = _quiet(lf.calculate_filters, float(level), REFERENCE, SCALE)
-    lf.check_budget(result, float(level), REFERENCE, SCALE)
+    result = _quiet(lf.calculate_filters, comp)
+    lf.check_budget(result, comp)
     headroom = lf.headroom_adjustment(result)
 
-    _quiet(lf.write_markdown_table, result, float(level), REFERENCE, SCALE,
-           headroom, os.path.join(REW_DIR, f"{stem}.md"))
-    _quiet(lf.write_camilladsp_yaml, result, float(level), REFERENCE, SCALE,
-           headroom, os.path.join(REW_DIR, f"{stem}.yml"))
+    _quiet(lf.write_markdown_table, result, comp, headroom,
+           os.path.join(REW_DIR, f"{stem}.md"))
+    _quiet(lf.write_camilladsp_yaml, result, comp, headroom,
+           os.path.join(REW_DIR, f"{stem}.yml"))
 
     if with_figures:
-        _quiet(lf.plot_frequency_response, result, float(level), REFERENCE,
-               SCALE, headroom, os.path.join(IMAGES_DIR, f"{stem}.png"))
-        target = ideal_delta(float(level), REFERENCE, SCALE)
+        _quiet(lf.plot_frequency_response, result, comp, headroom,
+               os.path.join(IMAGES_DIR, f"{stem}.png"))
         _quiet(checker.plot_residual_error,
-               get_filter_response(result["filters"], ISO_FREQ) - target,
-               float(level), REFERENCE, SCALE,
-               os.path.join(IMAGES_DIR, f"{stem}_error.png"))
+               get_filter_response(result["filters"], ISO_FREQ)
+               - ideal_delta(comp),
+               comp, os.path.join(IMAGES_DIR, f"{stem}_error.png"))
 
     elapsed = time.perf_counter() - started
     return headroom, result, elapsed
