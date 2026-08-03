@@ -62,34 +62,15 @@ This project uses **option 2** and prints the exact attenuation to apply.
 
 ## Requirements
 
-```bash
-pip install -r requirements.txt
-```
+**To use the filters: nothing.** The presets in [REW](REW) are plain text —
+type them into Roon, or load the YAML into REW or CamillaDSP. Skip to
+[Importing into REW, Roon and other DSPs](#importing-into-rew-roon-and-other-dsps).
 
-### You must supply the ISO 226:2023 Table 1 coefficients
-
-**Running the generator requires a copy of ISO 226:2023.** Using the presets
-does not — skip this section if you only want the ready-made filters in
-[REW](REW).
-
-Table 1 holds the 29 per-frequency coefficients that ISO 226 Formula (1) is
-evaluated from. They belong to ISO, permission to redistribute them was
-requested and has not been granted, so they are not in this repository. Without
-them nothing here computes:
-
-```bash
-cp tests/iso226_table1.py.example reference/iso226_table1.py
-# then fill in the three columns from your own copy of the standard
-```
-
-The standard is at <https://www.iso.org/standard/83117.html>. The template
-explains the ordering, and the loader checks the column lengths and the one
-structural property that does not restate an ISO value — that `L_U` is 0.0 at
-1 kHz, which it is by definition — so an off-by-one during transcription is
-caught rather than silently shifting every contour.
-
-Anyone doing serious work with equal-loudness contours should have the standard
-anyway. See [NOTICE](NOTICE) for the full position.
+**To run the generator yourself:** Python, plus your own copy of ISO 226:2023.
+The coefficient table the maths is built on belongs to ISO and is not
+redistributable, so it is not in this repository and the code will not run
+without it. [CONTRIBUTING.md](CONTRIBUTING.md) has the setup;
+[NOTICE](NOTICE) has the full position on why.
 
 ---
 
@@ -136,49 +117,11 @@ Reads the **published, rounded** filter values back out of the Markdown table,
 compares them against the ideal ISO 226 target, prints the maximum residual
 error, and saves `filter_<reference>_to_<level>_s<scale>_error.png`.
 
-### Tests
+### Working on the code
 
-```bash
-python -m pytest tests/                  # everything
-python -m pytest tests/ -m "not slow"    # skip the tests that run the optimizer
-```
-
-Most tests are fast. A handful are marked `slow` because they generate a real
-preset (~30 s) and then assert the properties that actually ship: that no band
-exceeds the host's ±12 dB limit, that adjacent bands stay far enough apart, that
-the total gain budget holds, that the search returns values already at
-publication precision, that the extrapolation outside the ISO range stays
-bounded, and — the one that matters most — that the published headroom figure
-really does keep the response at or below 0 dBFS at every verified sample rate.
-
-Two of these tests exist because the obvious way to verify this project does not
-work.
-
-`check.py` computes the ideal target with the same `iso226_spl` used to design
-the filters, and evaluates the filters with the same `get_filter_response` used
-to fit them. It therefore cannot detect an error in either routine — it can only
-confirm that rounding and parsing are faithful. A low residual error printed by
-`check.py` is not evidence that the math is right.
-
-So the suite anchors on things the project does not compute itself:
-
-* `test_matches_published_annex_b` checks Formula (1) against contour values
-  published in **ISO 226:2023 Annex B, Table B.1**. See *Verification against
-  the standard* below — this test ships disabled, because those values are
-  ISO's.
-* `test_high_shelf_passband_is_flat_at_every_rate` and
-  `test_shelves_never_overshoot_their_own_gain` check the biquads against
-  properties a shelving filter must have by definition — a cut may never produce
-  a boost, and a high shelf must be 0 dB well below its corner.
-
-That second group caught a real sign error in the `b2` coefficient of the
-high-shelf formula that had been present since the project's first version. The
-faulty term scaled with `cos(w0)`, so it was almost invisible at the sample rate
-and corner frequency most often used, and grew from there. In the previously
-shipped 65 dB preset it produced a **0.467 dB passband offset at 44.1 kHz, a
-1.46 dB error at 14.2 kHz, and a 6.25 dB error at 96 kHz** — while `check.py`
-reported a maximum residual error of 0.1185 dB, because it was measuring the
-filters with the same broken function that built them.
+Running the test suite, the linter or `regenerate.py` needs the ISO
+coefficient table described above. [CONTRIBUTING.md](CONTRIBUTING.md) covers
+the setup, the suite and the code-quality bar.
 
 ---
 
@@ -605,18 +548,25 @@ paywall and is licensed single-user; its values are therefore **not included
 here**. The test that performs the check (`test_matches_published_annex_b`)
 ships disabled and skips with an explanatory message.
 
-If you own a copy of ISO 226:2023, you can re-run the verification yourself in
-about two minutes: copy `tests/annex_b_reference.py.example` to
-`reference/annex_b_2023.py`, type in the 40 phon row of Table B.1, and run
-`pytest`. Nothing else changes. Everyone else gets a suite that still exercises
-the biquad identities, the target construction and the generator — just not the
-one assertion that depends on ISO's data.
+If you own a copy of ISO 226:2023, you can re-run that verification yourself in
+about two minutes — type in the 40 phon row of Table B.1 and run the suite;
+[CONTRIBUTING.md](CONTRIBUTING.md) has the mechanics. Nothing else changes.
+Everyone else gets a suite that still exercises the biquad identities, the
+target construction and the generator — just not the one assertion that depends
+on ISO's data.
 
 This matters more than it might appear. `check.py` computes its ideal target and
 evaluates its filters with the very functions it is checking, so a low residual
 error there proves nothing about whether the math is right. Annex B is the only
 external anchor in the project — the single point where the implementation is
 measured against something it did not produce.
+
+The same reasoning applies to the biquads, which are checked against properties
+a shelving filter must have by definition rather than against their own output.
+That is not academic: it caught a sign error in the high-shelf formula that had
+shipped since the project's first version, producing errors of up to 6.25 dB at
+96 kHz while the self-referential check reported 0.1185 dB. The details are in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 > **On the 2003 edition.** ISO 226:2003 is superseded and is not used here.
 > The two editions are not interchangeable: the third edition restructured
@@ -811,12 +761,17 @@ compensation have little hearing left above 12.5 kHz.
 
 The software is MIT licensed — see [LICENSE](LICENSE).
 
-That licence covers this project's own code. It does **not** cover the ISO 226
-Table 1 coefficients reproduced in `iso226_utils.py`, which belong to ISO and
-are not mine to sub-license. ISO confirmed on 1 August 2026 that reproducing
-Table 1 requires explicit permission; a request is currently with ANSI, the ISO
-member body for the United States. If permission is refused the coefficients
-will be removed. See [NOTICE](NOTICE) for the details.
+That licence covers this project's own code, including the generated presets in
+[REW](REW) — those are this project's own fitted filter values, not ISO's, and
+you can use them freely.
+
+It does not cover anything from ISO 226:2023, and **nothing from the standard is
+reproduced here.** ISO confirmed on 1 August 2026 that reproducing Table 1
+requires explicit permission; a request is with ANSI, the ISO member body for
+the United States. Pending an answer, the coefficients were removed rather than
+shipped on an assumption, and the generator loads them from a file you supply
+yourself. See [NOTICE](NOTICE) for the details and
+[CONTRIBUTING.md](CONTRIBUTING.md) for the setup.
 
 This project is not a substitute for the standard. Anyone doing serious work
 with equal-loudness contours should [buy

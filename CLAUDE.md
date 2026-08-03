@@ -11,6 +11,8 @@ listening rooms.
 
 ## Commands
 
+Full developer setup is in `CONTRIBUTING.md`; this is the short form.
+
 ```bash
 pip install -r requirements.txt
 
@@ -246,6 +248,15 @@ lives in `regenerate.py` — so this applies to anything new.)
   per-reference grid, it is redundant.
 - **README.md quotes generated numbers** (headroom, residual errors, filter
   tables). Regenerate the presets and update the README together.
+- **The three docs have different audiences; keep them separate.**
+  `README.md` is for listeners and for people interested in the theory — using
+  the presets, measuring `--level`, the maths, the relationship to the standard.
+  `CONTRIBUTING.md` is for anyone cloning the repo — obtaining the ISO data,
+  running the suite, the pylint bar. `CLAUDE.md` is the working notes.
+  Setup mechanics (`cp ... .example`, `pytest`, `pylint`) belong in
+  `CONTRIBUTING.md`, not the README; a claim about *what was verified* belongs
+  in the README, with the how-to linked. Do not restate one in the other —
+  cross-link.
 
 ## Domain facts worth knowing before changing the math
 
