@@ -18,11 +18,67 @@ import pytest
 # pylint: disable=wrong-import-position
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import iso226_utils  # noqa: E402
 from iso226_utils import (  # noqa: E402
-    ANNEX_B_TOLERANCE_DB, ISO226_PHON_MAX, ISO226_PHON_MIN, ISO_FREQ,
-    REF_1KHZ_INDEX, VERIFY_RATES, get_filter_response, ideal_delta,
-    iso226_spl, peak_gain,
+    ALPHA_R, ANNEX_B_TOLERANCE_DB, ISO226_PHON_MAX, ISO226_PHON_MIN, ISO_AF,
+    ISO_FREQ, ISO_TF, REF_1KHZ_INDEX, T_R, VERIFY_RATES, get_filter_response,
+    ideal_delta, iso226_spl, peak_gain,
 )
+
+
+# --- Table 1 loader --------------------------------------------------------
+#
+# Every value below is invented. The loader validates the *shape* of Table 1 and
+# never its contents, so these tests need no ISO data -- which is the point: the
+# coefficients are not in this repository and must not be reintroduced here.
+
+def _synthetic_table(tmp_path, alpha_f=None, l_u=None, t_f=None):
+    """Write a Table 1 module with arbitrary, correctly shaped columns."""
+    count = len(ISO_FREQ)
+    if l_u is None:
+        l_u = [0.0] * count           # 0.0 at 1 kHz, as the definition requires
+    path = tmp_path / "iso226_table1.py"
+    path.write_text(
+        f"ISO_AF = {list(alpha_f if alpha_f is not None else [0.3] * count)}\n"
+        f"ISO_LU = {list(l_u)}\n"
+        f"ISO_TF = {list(t_f if t_f is not None else [2.4] * count)}\n",
+        encoding="utf-8")
+    return str(path)
+
+
+def test_loader_reports_a_missing_table(monkeypatch, tmp_path):
+    """The message has to say what to copy where; nothing runs without it."""
+    monkeypatch.setattr(iso226_utils, "TABLE1_PATH", str(tmp_path / "absent.py"))
+    with pytest.raises(ImportError, match="iso226_table1.py.example"):
+        iso226_utils._load_table1()  # pylint: disable=protected-access
+
+
+def test_loader_rejects_a_short_column(monkeypatch, tmp_path):
+    """A truncated paste would otherwise misalign every contour silently."""
+    path = _synthetic_table(tmp_path, alpha_f=[0.3] * (len(ISO_FREQ) - 1))
+    monkeypatch.setattr(iso226_utils, "TABLE1_PATH", path)
+    with pytest.raises(ImportError, match="ISO_AF has 28 values"):
+        iso226_utils._load_table1()  # pylint: disable=protected-access
+
+
+def test_loader_rejects_a_misaligned_lu_column(monkeypatch, tmp_path):
+    """L_U is 0.0 at 1 kHz by definition, so this catches an off-by-one.
+
+    Transcribing 29 rows by hand and dropping or doubling one is the likeliest
+    mistake, and it would otherwise shift every contour without any symptom.
+    """
+    shifted = [0.0] * len(ISO_FREQ)
+    shifted[REF_1KHZ_INDEX] = -2.7
+    path = _synthetic_table(tmp_path, l_u=shifted)
+    monkeypatch.setattr(iso226_utils, "TABLE1_PATH", path)
+    with pytest.raises(ImportError, match="misaligned"):
+        iso226_utils._load_table1()  # pylint: disable=protected-access
+
+
+def test_reference_tone_constants_come_from_the_table():
+    """ALPHA_R and T_R are derived, not restated, so they cannot drift."""
+    assert ALPHA_R == ISO_AF[REF_1KHZ_INDEX]
+    assert T_R == ISO_TF[REF_1KHZ_INDEX]
 
 
 # --- ISO 226 Formula (1) ---------------------------------------------------

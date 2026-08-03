@@ -6,17 +6,16 @@ which supersedes ISO 226:2003. The third edition revised Formula (1) itself and
 every alpha_f in Table 1; the two editions are not interchangeable.
 """
 
+import importlib.util
+import os
+
 import numpy as np
 from scipy.signal import freqz
 
 # ---------------------------------------------------------------------------
-# ISO 226:2023 Table 1 — per-frequency coefficients at the ISO 266 preferred
-# third-octave frequencies.
-#
-# These are the third-edition values. They differ throughout from ISO 226:2003:
-# every alpha_f changed when the loudness exponent at 1 kHz was revised from
-# 0.25 to 0.30, and several L_U values moved by 0.1 dB. Do not mix the two
-# editions' tables -- Formula (1) changed as well (see iso226_spl).
+# ISO 266 preferred third-octave frequencies. These index Table 1 and are the
+# R10 preferred-number series; they are kept here because they are needed to
+# align the coefficients that are not.
 # ---------------------------------------------------------------------------
 ISO_FREQ = np.array([
     20.0, 25.0, 31.5, 40.0, 50.0, 63.0, 80.0, 100.0, 125.0, 160.0, 200.0,
@@ -24,32 +23,83 @@ ISO_FREQ = np.array([
     2000.0, 2500.0, 3150.0, 4000.0, 5000.0, 6300.0, 8000.0, 10000.0, 12500.0
 ])
 
-ISO_AF = np.array([
-    0.635, 0.602, 0.569, 0.537, 0.509, 0.482, 0.456, 0.433, 0.412, 0.391,
-    0.373, 0.357, 0.343, 0.330, 0.320, 0.311, 0.303, 0.300, 0.295, 0.292,
-    0.290, 0.290, 0.289, 0.289, 0.289, 0.293, 0.303, 0.323, 0.354
-])
-
-ISO_LU = np.array([
-    -31.5, -27.2, -23.1, -19.3, -16.1, -13.1, -10.4, -8.2, -6.3, -4.6,
-    -3.2, -2.1, -1.2, -0.5, 0.0, 0.4, 0.5, 0.0, -2.7, -4.2,
-    -1.2, 1.4, 2.3, 1.0, -2.3, -7.2, -11.2, -10.9, -3.5
-])
-
-ISO_TF = np.array([
-    78.1, 68.7, 59.5, 51.1, 44.0, 37.5, 31.5, 26.5, 22.1, 17.9,
-    14.4, 11.4, 8.6, 6.2, 4.4, 3.0, 2.2, 2.4, 3.5, 1.7,
-    -1.3, -4.2, -6.0, -5.4, -1.5, 6.0, 12.6, 13.9, 12.3
-])
-
-# Reference-tone quantities appearing in Formula (1). The 1 kHz exponent moving
-# from 0.25 (2003) to 0.30 is the change that shifted the whole coefficient set.
-ALPHA_R = 0.30          # exponent for loudness perception at 1 kHz
-T_R = 2.4               # threshold of hearing at 1 kHz, dB
-P0_OVER_PA_SQ = 4e-10   # (p0/pa)^2, p0 = 20 uPa, pa = 1 Pa
-
 # Index of 1000 Hz in ISO_FREQ: every curve here is normalized to 0 dB there.
 REF_1KHZ_INDEX = 17
+
+# ---------------------------------------------------------------------------
+# ISO 226:2023 Table 1 — per-frequency coefficients for Formula (1).
+#
+# These belong to ISO and are not redistributable, so they are not committed.
+# Supply them from your own copy of the standard: see NOTICE and the template
+# at tests/iso226_table1.py.example. Unlike the Annex B fixture, which only
+# disables one test, nothing in this project evaluates without these.
+# ---------------------------------------------------------------------------
+TABLE1_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "reference", "iso226_table1.py")
+
+_TABLE1_MISSING = f"""ISO 226:2023 Table 1 coefficients not found.
+
+Expected: {TABLE1_PATH}
+
+These are the per-frequency coefficients of ISO 226 Formula (1). They belong to
+ISO and cannot be redistributed, so this repository does not carry them.
+
+  1. Copy tests/iso226_table1.py.example to reference/iso226_table1.py
+  2. Fill in the three columns of Table 1 from your own copy of the standard
+     (https://www.iso.org/standard/83117.html)
+
+The presets already in REW/ were generated with these coefficients and remain
+usable without this file; only regenerating them or building new listening
+levels needs it."""
+
+
+def _load_table1():
+    """Load Table 1 from reference/, checking its shape but not its values.
+
+    The only content check is structural: L_U is specified *relative to 1 kHz*,
+    so its 1 kHz entry is 0.0 by definition rather than by measurement. Testing
+    it catches an off-by-one during transcription -- the likeliest mistake --
+    without this file asserting any value that belongs to ISO.
+    """
+    if not os.path.exists(TABLE1_PATH):
+        raise ImportError(_TABLE1_MISSING)
+
+    spec = importlib.util.spec_from_file_location("iso226_table1", TABLE1_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    def column(name):
+        values = getattr(module, name, None)
+        if not values:
+            raise ImportError(
+                f"{TABLE1_PATH} defines no {name}, or leaves it empty. "
+                f"See tests/iso226_table1.py.example.")
+        found = np.asarray(values, dtype=float)
+        if found.shape != ISO_FREQ.shape:
+            raise ImportError(
+                f"{TABLE1_PATH}: {name} has {found.size} values, expected "
+                f"{ISO_FREQ.size} -- one per ISO 266 preferred frequency from "
+                f"20 Hz to 12.5 kHz.")
+        return found
+
+    alpha_f, l_u, t_f = column("ISO_AF"), column("ISO_LU"), column("ISO_TF")
+    if l_u[REF_1KHZ_INDEX] != 0.0:
+        raise ImportError(
+            f"{TABLE1_PATH}: ISO_LU at 1 kHz (index {REF_1KHZ_INDEX}) is "
+            f"{l_u[REF_1KHZ_INDEX]}, but L_U is defined relative to 1 kHz and "
+            "must be 0.0 there. The columns are probably misaligned.")
+    return alpha_f, l_u, t_f
+
+
+ISO_AF, ISO_LU, ISO_TF = _load_table1()
+
+# Reference-tone quantities in Formula (1). The first two are the 1 kHz entries
+# of Table 1, derived rather than restated so there is one source for each. The
+# 1 kHz exponent moving from 0.25 (2003) to 0.30 is the change that shifted the
+# whole coefficient set.
+ALPHA_R = float(ISO_AF[REF_1KHZ_INDEX])   # loudness exponent at 1 kHz
+T_R = float(ISO_TF[REF_1KHZ_INDEX])       # threshold of hearing at 1 kHz, dB
+P0_OVER_PA_SQ = 4e-10                     # (p0/pa)^2, p0 = 20 uPa, pa = 1 Pa
 
 # ISO 226:2023 s4.1 states Formula (1) applies from a lower limit of 20 phon
 # up to 90 phon (20 Hz - 4 kHz) and 80 phon (5 kHz - 12.5 kHz).

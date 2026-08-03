@@ -1,0 +1,44 @@
+"""Template for the ISO 226:2023 Table 1 coefficients.
+
+**Nothing in this project runs without these.** They are the per-frequency
+coefficients of ISO 226:2023 Formula (1), and the formula cannot be evaluated
+without them -- unlike the Annex B fixture, which only disables one test.
+
+They are ISO's, not this project's, and are not redistributable. To use the
+generator, copy this file to `reference/iso226_table1.py` and fill in the three
+columns of Table 1 from your own copy of the standard:
+
+    https://www.iso.org/standard/83117.html
+
+Each list holds 29 values, in order, at the ISO 266 preferred third-octave
+frequencies from 20 Hz to 12.5 kHz:
+
+    20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160,
+    200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600,
+    2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500
+
+Use the **third edition** values. ISO 226:2003 is not interchangeable: every
+alpha_f changed when the loudness exponent at 1 kHz was revised from 0.25 to
+0.30, several L_U values moved by 0.1 dB, and Formula (1) itself changed.
+
+The loader checks that each column has 29 entries and that L_U at 1 kHz is
+exactly 0.0 -- which it is by definition, since L_U is specified relative to
+1 kHz. That catches an off-by-one during transcription, the likeliest mistake.
+
+If you do not hold a copy of the standard, the presets in `REW/` were generated
+with these coefficients and are usable as they are; only regenerating them or
+building new levels needs this file.
+"""
+
+# alpha_f -- exponent of loudness perception (Table 1, column 2)
+ISO_AF = [
+]
+
+# L_U -- magnitude of the linear transfer function normalized at 1 kHz, dB
+# (Table 1, column 3). The 1 kHz entry, index 17, is 0.0.
+ISO_LU = [
+]
+
+# T_f -- threshold of hearing, dB (Table 1, column 4)
+ISO_TF = [
+]

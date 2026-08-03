@@ -14,6 +14,9 @@ listening rooms.
 ```bash
 pip install -r requirements.txt
 
+# Required before anything runs — see "ISO data" below
+cp tests/iso226_table1.py.example reference/iso226_table1.py   # then populate it
+
 # Generate filter_<ref>_to_<level>_s<scale>.{md,yml,png}
 python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 
@@ -21,8 +24,8 @@ python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 python check.py --level <db> [--reference <db>] [--scale <s>]
 
 # Regression tests — run after touching any math
-python -m pytest tests/                  # all 66 (~30 s)
-python -m pytest tests/ -m "not slow"    # 55 fast ones (~2 s)
+python -m pytest tests/                  # all 70 (~30 s)
+python -m pytest tests/ -m "not slow"    # 59 fast ones (~2 s)
 
 # Rebuild every committed preset and figure (several minutes)
 python regenerate.py
@@ -74,6 +77,30 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     the repo: they live in the gitignored `reference/annex_b_2023.py`, supplied
     from `tests/annex_b_reference.py.example` by whoever owns the standard.
     Without them `test_matches_published_annex_b` skips.
+
+### ISO data — no ISO numbers live in this repository
+
+Two separate sets, both gitignored under `reference/`, both supplied by whoever
+holds the standard. Do not commit either, and do not "helpfully" inline values
+found in a paper, a Wikipedia table or another repository — provenance is the
+whole point.
+
+- **Table 1** (`reference/iso226_table1.py`, template
+  `tests/iso226_table1.py.example`) — `ISO_AF` / `ISO_LU` / `ISO_TF`, loaded by
+  `_load_table1()`. **Nothing runs without it**: no import, no tests, no
+  generator. That is the intended behaviour, not a bug to work around.
+  `ALPHA_R` and `T_R` are *derived* from its 1 kHz entries rather than restated,
+  so there is one source for each number.
+- **Annex B** (`reference/annex_b_2023.py`) — verification only; its absence
+  skips one test.
+
+`ISO_FREQ` (ISO 266 preferred frequencies) stays committed: it is the R10
+preferred-number series, needed to index the columns that are absent.
+
+The loader validates shape, not values — column lengths, plus `ISO_LU` being
+0.0 at 1 kHz, which is true by definition since `L_U` is specified relative to
+1 kHz. That catches a transcription off-by-one without this repo asserting any
+value it does not own.
 
 - **`loudness-filters.py`** — generator CLI.
   - `_fit_bands(...)`: minimax fit in **epigraph form** (minimize `t` subject to

@@ -66,6 +66,31 @@ This project uses **option 2** and prints the exact attenuation to apply.
 pip install -r requirements.txt
 ```
 
+### You must supply the ISO 226:2023 Table 1 coefficients
+
+**Running the generator requires a copy of ISO 226:2023.** Using the presets
+does not — skip this section if you only want the ready-made filters in
+[REW](REW).
+
+Table 1 holds the 29 per-frequency coefficients that ISO 226 Formula (1) is
+evaluated from. They belong to ISO, permission to redistribute them was
+requested and has not been granted, so they are not in this repository. Without
+them nothing here computes:
+
+```bash
+cp tests/iso226_table1.py.example reference/iso226_table1.py
+# then fill in the three columns from your own copy of the standard
+```
+
+The standard is at <https://www.iso.org/standard/83117.html>. The template
+explains the ordering, and the loader checks the column lengths and the one
+structural property that does not restate an ISO value — that `L_U` is 0.0 at
+1 kHz, which it is by definition — so an off-by-one during transcription is
+caught rather than silently shifting every contour.
+
+Anyone doing serious work with equal-loudness contours should have the standard
+anyway. See [NOTICE](NOTICE) for the full position.
+
 ---
 
 ## Usage
@@ -310,8 +335,8 @@ number that missed. That is the honest limit of five bands at those levels.
 
 ### Pre-generated filters (no Python required)
 
-Ready-made CamillaDSP YAML files for an 83 dB mastering reference are in the
-[REW](REW) directory:
+These need neither Python nor a copy of the standard. Ready-made CamillaDSP YAML
+files for an 83 dB mastering reference are in the [REW](REW) directory:
 
 | File | Listening level | Relative to reference |
 | :--- | :--- | :--- |

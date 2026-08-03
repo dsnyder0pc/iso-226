@@ -10,28 +10,38 @@ It does NOT and CANNOT cover the following, which is not mine to license.
 ISO 226:2023, Table 1
 ---------------------
 
-The per-frequency coefficients in `iso226_utils.py` (`ISO_AF`, `ISO_LU` and
-`ISO_TF`, 29 values each) are reproduced from Table 1 of
+The per-frequency coefficients of Table 1 (`alpha_f`, `L_U` and `T_f`, 29
+values each) of
 
     ISO 226:2023, Acoustics -- Normal equal-loudness-level contours
     (c) International Organization for Standardization
 
-They are reproduced because ISO 226 Formula (1) cannot be evaluated without
-them: with those coefficients removed, the software has no function.
+are **not reproduced in this repository.** They are loaded at runtime from
+`reference/iso226_table1.py`, which is gitignored and which each user supplies
+from their own copy of the standard. The template and instructions are in
+`tests/iso226_table1.py.example`.
 
-**Permission for this reproduction has been requested and is pending.** ISO
+This is not a token gesture: ISO 226 Formula (1) cannot be evaluated without
+those coefficients, so without that file the software has no function. Nothing
+here reconstructs, approximates or works around them.
+
+Permission to reproduce Table 1 was requested and, pending an answer, the
+coefficients have been removed rather than shipped on an assumption. ISO
 customer service confirmed on 1 August 2026 that reproducing Table 1
 constitutes reproduction of ISO content, that it requires explicit permission
 or a licensing agreement rather than being covered automatically by fair use,
 and that such permissions are handled by the national ISO member body -- ANSI
-in the United States. A request is with ANSI. **If permission is refused, these
-coefficients will be removed and this notice updated to say so.**
+in the United States. A request is with ANSI. **If permission is granted, the
+coefficients may be restored and this notice updated to say so.**
+
+The generated presets in `REW/` are this project's own fitted filter values,
+not ISO's, and remain usable without the standard.
 
 Nothing else from the standard is reproduced here beyond short quotations of
 the Scope and of the stated range of validity of Formula (1). Annex B is
-deliberately excluded: it is used only to verify this implementation, the values
-are not in this repository, and the test that uses them is disabled unless a
-user supplies them from their own copy of the standard.
+excluded on the same basis: it is used only to verify this implementation, the
+values are not in this repository, and the test that uses them is disabled
+unless a user supplies them from their own copy of the standard.
 
 **This project is not a substitute for the standard.** Anyone doing serious
 work with equal-loudness contours should buy it:
@@ -41,5 +51,8 @@ https://www.iso.org/standard/83117.html
 ISO 266
 -------
 
-`ISO_FREQ` is the preferred one-third-octave frequency series of ISO 266,
-included so the coefficients above are correctly indexed.
+`ISO_FREQ` in `iso226_utils.py` is the preferred one-third-octave frequency
+series of ISO 266. It is retained because the Table 1 columns must be indexed
+against something, and because the series is the R10 preferred-number series --
+20, 25, 31.5, 40 and so on -- which is a rounded geometric progression rather
+than measured data.
