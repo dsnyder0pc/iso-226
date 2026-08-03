@@ -6,8 +6,11 @@ Fits a parametric EQ to the ISO 226 equal-loudness compensation target for a
 given listening level relative to a mastering reference level, and writes a
 Markdown table, a CamillaDSP YAML file, and a frequency-response plot.
 
-The filter set is nested: bands 1-5 are a complete, standalone full-spectrum
-correction, and bands 6-10 refine it. A listener can enter five bands and stop.
+The filter set is a single group of five bands spanning the full spectrum.
+An earlier version published a second group of five "refinement" bands on top
+of them; measurement showed those bands changed the response by less than the
+rounding applied to publish them, so they were removed rather than asking
+anyone to type filters that do nothing.
 """
 
 # pylint: disable=invalid-name
@@ -43,6 +46,57 @@ MAX_HEADROOM = 12.0
 # zero at that precision cannot do anything when entered by hand.
 HOST_GAIN_PRECISION_DB = 0.1
 
+# --- Publication precision --------------------------------------------------
+# Roon's collapsed filter list renders frequency as an integer, gain to 0.1 dB
+# and Q to 0.01, but that is display only: entering 100.4 Hz and entering
+# 100.0 Hz produce visibly different response curves, so the full float is
+# stored and used. What we publish is therefore chosen from what changes the
+# response, not from what the host echoes back.
+#
+# Measured, per band, as the step that moves the cascade by 0.005 dB:
+#
+#   * Sensitivity tracks gain x Q, not frequency. The high shelf is the most
+#     demanding band in the set (0.08% at 9.9 kHz, because it carries +4.6 dB),
+#     while the low-gain interior peaks tolerate 1-2%. A fixed number of decimal
+#     places is the wrong shape for a column spanning three decades: 0.1 Hz is
+#     marginal at 38 Hz and a hundred times finer than needed at 9.9 kHz.
+#     Four significant figures holds >=10x margin at both ends.
+#   * Q is the sensitive parameter by roughly twenty times. At 0.1 it costs
+#     0.17-0.37 dB; at 0.01 it costs 0.010-0.017 dB and becomes the floor under
+#     the whole published format.
+#   * Gain at 0.1 dB costs 0.016-0.063 dB; at 0.01 dB it costs 0.002-0.004 dB,
+#     which is already below the floor Q sets. A third decimal buys nothing.
+FREQ_SIGNIFICANT_DIGITS = 4
+GAIN_DECIMALS = 2
+Q_DECIMALS = 2
+
+# --- Search termination -----------------------------------------------------
+# The fit is a non-convex minimax solved by a local method (SLSQP) from several
+# starting points; a restart is one complete solve. The objective is the error
+# of the ROUNDED values, because that is what ships -- scoring on the raw fit
+# lets a restart win that is better before rounding and worse after, which was
+# observed to make the 62 dB preset 16% worse when the restart count was raised.
+PUBLISHED_ERROR_TARGET_DB = 0.05
+
+# Restarts are independent draws, so the chance of never finding a good basin
+# decays geometrically and the tail is long. Stop early when the search has
+# clearly settled, and cap it so an unreachable target cannot spin forever.
+MAX_RESTARTS = 24
+STAGNATION_LIMIT = 6
+
+# Meeting the target does not end the search on its own. The deterministic first
+# attempt often clears it at the easy end of the ladder, and exiting there ships
+# whatever that one guess happened to find: at 83 -> 80 dB it doubled the
+# published error (0.0218 -> 0.0440 dB) purely because the search stopped before
+# looking anywhere else. Give every level at least this many draws before the
+# target is allowed to cut the search short.
+MIN_RESTARTS = 6
+
+# A returned point counts as feasible only if every constraint holds to this
+# tolerance. SLSQP can exit without converging and return a point that fits
+# well in band while violating the gain budget or the extrapolation bound.
+CONSTRAINT_TOLERANCE = 1e-6
+
 # Anti-degeneracy: an unconstrained minimax fit will happily place two large,
 # nearly cancelling filters at almost the same frequency (e.g. +17.33 dB at
 # 396 Hz against -16.12 dB at 438 Hz). The end-to-end magnitude response is
@@ -59,13 +113,11 @@ HOST_GAIN_PRECISION_DB = 0.1
 #   * It wastes headroom for no accuracy benefit.
 #
 # Three constraints remove the degenerate family: a budget on total absolute
-# gain, non-overlapping frequency ranges within a tier, and a minimum spacing
-# ratio between consecutive bands. The spacing constraint is what actually does
-# the work -- non-overlapping ranges alone still allow two bands to meet at a
+# gain, non-overlapping per-band frequency ranges, and a minimum spacing ratio
+# between consecutive bands. The spacing constraint is what actually does the
+# work -- non-overlapping ranges alone still allow two bands to meet at a
 # shared range boundary, which is exactly where a cancelling pair forms.
 GAIN_BUDGET_FACTOR = 2.0
-REFINEMENT_GAIN_BUDGET_FACTOR = 0.4
-MIN_REFINEMENT_GAIN_BUDGET = 2.0
 
 # Consecutive bands must be at least this far apart in frequency (~3/4 octave).
 MIN_SPACING_RATIO = 1.7
@@ -81,27 +133,25 @@ def _progress(message, end="\n"):
 
 
 # --- Filter topology --------------------------------------------------------
-# Both tiers span the full spectrum. Treble compensation belongs in the
-# essential set: at low levels the loss of perceived treble is as consequential
-# as the loss of bass, particularly for listeners with age-related HF loss.
+# The set spans the full spectrum. Treble compensation belongs in it as much as
+# bass: at low levels the loss of perceived treble is as consequential, and
+# more so for listeners with age-related HF loss.
 #
 # There is deliberately no band above 12 kHz. ISO 226 data stops at 12.5 kHz,
 # and a 16 kHz shelf both extrapolates without evidence and behaves very
 # differently across sample rates as it interacts with Nyquist.
 #
-# Frequency ranges within a tier are non-overlapping, so two bands of the same
-# tier can never converge on the same frequency to form a cancelling pair.
+# Frequency ranges are non-overlapping, so two bands can never converge on the
+# same frequency to form a cancelling pair. These bounds are hand-tuned and
+# earn it: replacing them with even log spacing over the same span costs a
+# factor of five in published error (0.027 dB -> 0.133 dB at 83 -> 74 dB).
 LOW_SHELF, PEAK, HIGH_SHELF = 'Low Shelf', 'Peak', 'High Shelf'
 
-TIER1_TYPES = [LOW_SHELF, PEAK, PEAK, PEAK, HIGH_SHELF]
-TIER1_FC_BOUNDS = [(30.0, 120.0), (120.0, 450.0), (450.0, 1600.0),
-                   (1600.0, 5500.0), (5500.0, 12000.0)]
+BAND_TYPES = [LOW_SHELF, PEAK, PEAK, PEAK, HIGH_SHELF]
+BAND_FC_BOUNDS = [(30.0, 120.0), (120.0, 450.0), (450.0, 1600.0),
+                  (1600.0, 5500.0), (5500.0, 12000.0)]
 
-TIER2_TYPES = [LOW_SHELF, PEAK, PEAK, PEAK, HIGH_SHELF]
-TIER2_FC_BOUNDS = [(20.0, 80.0), (80.0, 300.0), (300.0, 1100.0),
-                   (1100.0, 4000.0), (4000.0, 11000.0)]
-
-TIER_SIZE = 5
+BAND_COUNT = len(BAND_TYPES)
 
 MIN_Q, MAX_Q = 0.25, 2.0
 
@@ -124,22 +174,81 @@ def validate_parameters(target_level, ref_level, scale=1.0):
         )
 
 
-def _fit_bands(types, fc_bounds, grid, target, in_band, gain_budget,
-               fixed=(), restarts=4, seed=0):
-    """Minimax fit of one group of bands, optionally on top of fixed bands.
+def _sigfig(value, digits):
+    """Round to a fixed number of significant figures."""
+    if value == 0:
+        return 0.0
+    return float(round(value, -int(np.floor(np.log10(abs(value)))) + digits - 1))
 
-    Solved in epigraph form -- minimize t subject to |error| <= t -- rather than
-    by handing max(abs(error)) to a gradient optimizer. The maximum of absolute
-    values is not differentiable at its optimum, which is exactly where the
-    solver spends its time; the epigraph form is smooth and converges properly.
+
+def publication_round(filters):
+    """Round to the precision the Markdown table publishes.
+
+    Frequency carries significant figures rather than decimal places because
+    its sensitivity is fractional; gain and Q carry decimals. See the
+    publication-precision notes at the top of this module for the measurements
+    behind each choice.
+    """
+    return [(ftype,
+             _sigfig(float(fc), FREQ_SIGNIFICANT_DIGITS),
+             round(float(gain), GAIN_DECIMALS),
+             round(float(q), Q_DECIMALS))
+            for ftype, fc, gain, q in filters]
+
+
+def _restart_point(attempt, rng, seeds, bounds):
+    """Starting point for one multistart attempt, clipped into ``bounds``.
+
+    Attempt 1 is the deterministic neutral guess: flat gains, every band at the
+    geometric mean of its own frequency range, mid Q. Later attempts randomize,
+    with the frequency jitter kept mild so a restart still satisfies
+    MIN_SPACING_RATIO before the solver has done anything.
+    """
+    n = len(seeds)
+    if attempt == 1:
+        values = [0.0] * n + list(seeds) + [0.7] * n
+    else:
+        values = (list(rng.uniform(-2.0, 6.0, n))
+                  + [s * float(rng.uniform(0.85, 1.18)) for s in seeds]
+                  + list(rng.uniform(0.4, 1.1, n)))
+    return np.array([min(max(v, lo), hi)
+                     for v, (lo, hi) in zip(values, bounds)])
+
+
+def _fit_bands(types, fc_bounds, grid, target, in_band, gain_budget, seed=0):
+    """Search for the published band set with the smallest rounded error.
+
+    Each attempt is solved in epigraph form -- minimize t subject to
+    |error| <= t -- rather than by handing max(abs(error)) to a gradient
+    optimizer. The maximum of absolute values is not differentiable at its
+    optimum, which is exactly where the solver spends its time; the epigraph
+    form is smooth and converges properly.
 
     In-band error drives the objective. Outside the ISO data range the error is
     merely constrained, so the extrapolation stays bounded without consuming
     the accuracy budget where the standard actually has evidence. Total absolute
     gain is capped by ``gain_budget`` to rule out large offsetting band pairs.
+
+    SLSQP is a local method and this problem is not convex, so the fit is a
+    multistart: each attempt solves from a different starting point and the best
+    survives. Two rules make running the search longer monotonically safe, which
+    the target-driven loop depends on:
+
+      * an attempt is scored on its PUBLISHED error, so the winner is whichever
+        set is best *after* rounding. Scoring on the raw fit lets an attempt win
+        that is better before rounding and worse after -- which is not
+        hypothetical: it made the 62 dB preset 16% worse (0.0986 -> 0.1140 dB)
+        when the restart count was raised.
+      * an attempt is discarded unless SLSQP reports convergence and the point
+        it returns satisfies every constraint. Nothing downstream re-checks the
+        gain budget or the extrapolation bound, so an unconverged point that
+        happened to fit well in band would otherwise be published.
+
+    Returns:
+        dict with 'filters' (rounded), 'error' (published), the number of
+        'restarts' spent and whether 'target_met'.
     """
     n = len(types)
-    fixed = list(fixed)
     seeds = [float(np.sqrt(lo * hi)) for lo, hi in fc_bounds]
     bounds = (
         [(-MAX_BAND_GAIN, MAX_BAND_GAIN)] * n
@@ -151,10 +260,14 @@ def _fit_bands(types, fc_bounds, grid, target, in_band, gain_budget,
         return [(types[i], p[n + i], p[i], p[2 * n + i]) for i in range(n)]
 
     def error(p):
-        return get_filter_response(fixed + unpack(p), grid, DESIGN_FS) - target
+        return get_filter_response(unpack(p), grid, DESIGN_FS) - target
 
     def in_band_error(p):
         return float(np.max(np.abs(error(p)[in_band])))
+
+    def published_error(filters):
+        response = get_filter_response(filters, grid, DESIGN_FS)
+        return float(np.max(np.abs((response - target)[in_band])))
 
     def constraint(p):
         err = error(p)
@@ -170,20 +283,11 @@ def _fit_bands(types, fc_bounds, grid, target, in_band, gain_budget,
         ])
 
     rng = np.random.default_rng(seed)
-    best_value, best_params = np.inf, None
+    best_error, best_filters = np.inf, None
+    since_improved, attempt = 0, 0
 
-    for attempt in range(restarts):
-        if attempt == 0:
-            gains, freqs, qs = [0.0] * n, list(seeds), [0.7] * n
-        else:
-            gains = list(rng.uniform(-2.0, 6.0, n))
-            # Jitter is kept mild so restarts still satisfy MIN_SPACING_RATIO.
-            freqs = [s * float(rng.uniform(0.85, 1.18)) for s in seeds]
-            qs = list(rng.uniform(0.4, 1.1, n))
-        start = np.array([
-            min(max(v, lo), hi)
-            for v, (lo, hi) in zip(gains + freqs + qs, bounds)
-        ])
+    for attempt in range(1, MAX_RESTARTS + 1):
+        start = _restart_point(attempt, rng, seeds, bounds)
         x0 = np.concatenate([start, [in_band_error(start)]])
 
         result = minimize(
@@ -192,84 +296,77 @@ def _fit_bands(types, fc_bounds, grid, target, in_band, gain_budget,
             constraints=[{'type': 'ineq', 'fun': constraint}],
             options={'maxiter': 300, 'ftol': 1e-9},
         )
-        value = in_band_error(result.x[:3 * n])
-        if value < best_value:
-            best_value, best_params = value, result.x[:3 * n]
+        improved = False
+        feasible = (result.success
+                    and np.min(constraint(result.x)) >= -CONSTRAINT_TOLERANCE)
+        if feasible:
+            candidate = publication_round(unpack(result.x[:3 * n]))
+            value = published_error(candidate)
+            if value < best_error:
+                best_error, best_filters, improved = value, candidate, True
+        since_improved = 0 if improved else since_improved + 1
 
-    if best_params is None:
-        raise RuntimeError("Filter optimization failed to produce any solution.")
-    return best_value, unpack(best_params)
+        met_target = (best_error <= PUBLISHED_ERROR_TARGET_DB
+                      and attempt >= MIN_RESTARTS)
+        if met_target or since_improved >= STAGNATION_LIMIT:
+            break
 
-
-def _round_filters(filters):
-    """Round to the precision a user can actually enter into a DSP."""
-    return [(ftype, round(float(fc), 1), round(float(gain), 2), round(float(q), 2))
-            for ftype, fc, gain, q in filters]
+    if best_filters is None:
+        raise RuntimeError(
+            f"Filter optimization failed: none of the {attempt} restarts "
+            "produced a converged, feasible solution.")
+    return {
+        'filters': best_filters,
+        'error': best_error,
+        'restarts': attempt,
+        'target_met': best_error <= PUBLISHED_ERROR_TARGET_DB,
+    }
 
 
 def calculate_filters(target_level, ref_level, scale=1.0):
-    """Fit the nested two-tier filter set for a listening level.
-
-    Bands 1-5 are fitted first and then held fixed while bands 6-10 are fitted
-    on top of them, so the essential set is exactly the best standalone
-    five-band solution rather than a by-product of a ten-band fit.
+    """Fit the published filter set for a listening level.
 
     Returns:
-        dict with 'essential', 'refinement', 'all', 'error_essential',
-        'error_all' -- errors measured from the rounded, published values.
+        dict with 'filters' rounded to publication precision, the 'error' those
+        published values actually achieve, the number of 'restarts' spent and
+        whether 'target_met'.
     """
     validate_parameters(target_level, ref_level, scale)
     grid, target, in_band = build_target(target_level, ref_level, scale)
 
     span = float(np.ptp(target[in_band]))
-    tier1_budget = GAIN_BUDGET_FACTOR * span
-    tier2_budget = max(MIN_REFINEMENT_GAIN_BUDGET,
-                       REFINEMENT_GAIN_BUDGET_FACTOR * span)
+    gain_budget = GAIN_BUDGET_FACTOR * span
 
     _progress(f"Fitting listening level {_level_str(target_level)} dB against a "
               f"{ref_level:g} dB reference, scale {scale:.2f}.")
     # No time estimate: this is a constrained minimax with multistart, and how
-    # long it takes depends entirely on the machine. Each tier reports its own
-    # elapsed time instead, which is true everywhere.
-    _progress("Constrained minimax with multistart; tens of seconds per tier "
-              "on a typical desktop, longer on low-power hardware.")
-
-    _progress("  bands 1-5  (essential) ...", end=" ")
+    # long it takes depends both on the machine and on how quickly the search
+    # reaches its target. Elapsed time and restarts spent are reported after
+    # the fact instead, which is true everywhere.
+    _progress(f"  multistart to a {PUBLISHED_ERROR_TARGET_DB:g} dB published "
+              f"target, up to {MAX_RESTARTS} restarts ...", end=" ")
     started = time.perf_counter()
-    _, tier1 = _fit_bands(TIER1_TYPES, TIER1_FC_BOUNDS, grid, target, in_band,
-                          tier1_budget, seed=3)
-    tier1 = _round_filters(tier1)
-    _progress(f"done ({time.perf_counter() - started:.1f} s)")
+    result = _fit_bands(BAND_TYPES, BAND_FC_BOUNDS, grid, target, in_band,
+                        gain_budget, seed=3)
+    _progress(f"done ({time.perf_counter() - started:.1f} s, "
+              f"{result['restarts']} restarts)")
 
-    _progress("  bands 6-10 (refinement) ...", end=" ")
-    started = time.perf_counter()
-    _, tier2 = _fit_bands(TIER2_TYPES, TIER2_FC_BOUNDS, grid, target, in_band,
-                          tier2_budget, fixed=tier1, seed=5)
-    tier2 = _round_filters(tier2)
-    _progress(f"done ({time.perf_counter() - started:.1f} s)")
-
-    def published_error(filters):
-        resp = get_filter_response(filters, grid, DESIGN_FS)
-        return float(np.max(np.abs((resp - target)[in_band])))
-
-    return {
-        'essential': tier1,
-        'refinement': tier2,
-        'all': tier1 + tier2,
-        'error_essential': published_error(tier1),
-        'error_all': published_error(tier1 + tier2),
-    }
+    if not result['target_met']:
+        _progress(f"  note: best published error {result['error']:.4f} dB does "
+                  f"not reach the {PUBLISHED_ERROR_TARGET_DB:g} dB target. This "
+                  f"is the best {BAND_COUNT} bands can do at this level; the "
+                  "residual is still far below audibility.")
+    return result
 
 
 def headroom_adjustment(result):
-    """Single conservative headroom figure covering both tiers, in 0.1 dB steps.
+    """Headroom for the published set, in 0.1 dB steps.
 
-    Roon accepts one tenth of a dB, so the worst-case peak across both filter
-    sets and all verified sample rates is rounded away from zero. A listener who
-    enters only the essential five bands and one who enters all ten can use the
-    same number without either of them clipping.
+    Roon accepts one tenth of a dB, so the worst-case peak across all verified
+    sample rates is rounded away from zero rather than to nearest: a listener
+    who enters the published number must not clip at any of them.
     """
-    peak = max(peak_gain(result['essential']), peak_gain(result['all']))
+    peak = peak_gain(result['filters'])
     if peak <= 0.0:
         return 0.0
     return -np.ceil(peak * 10.0) / 10.0
@@ -369,9 +466,9 @@ def suggest_alternatives(target_level, ref_level, scale):
 
 def check_budget(result, target_level, ref_level, scale):
     """Raise a ValueError with actionable suggestions if the set cannot be used."""
-    peak = max(peak_gain(result['essential']), peak_gain(result['all']))
-    max_gain = max(abs(f[2]) for f in result['all'])
-    unreachable = result['error_essential'] > FIT_ERROR_LIMIT_DB
+    peak = peak_gain(result['filters'])
+    max_gain = max(abs(f[2]) for f in result['filters'])
+    unreachable = result['error'] > FIT_ERROR_LIMIT_DB
 
     if peak <= MAX_HEADROOM and not unreachable:
         return
@@ -381,7 +478,7 @@ def check_budget(result, target_level, ref_level, scale):
         f"available on Roon's Parametric EQ gain control"
         if peak > MAX_HEADROOM else
         f"the correction needs more than {MAX_BAND_GAIN:.0f} dB in a single band "
-        f"(best achievable error {result['error_essential']:.2f} dB)"
+        f"(best achievable error {result['error']:.2f} dB)"
     )
     sug_scale, sug_level = suggest_alternatives(target_level, ref_level, scale)
     lines = [
@@ -427,9 +524,20 @@ def preset_stem(level, ref_level, scale):
             f"_s{_scale_str(scale)}")
 
 
-def _filter_rows(filters, start=1):
-    return [f"| {i} | {f[0]} | {f[1]} | {f[2]:.2f} | {f[3]:.2f} |"
-            for i, f in enumerate(filters, start)]
+def _freq_str(fc):
+    """Frequency at publication precision, with no trailing zeros.
+
+    ``publication_round`` has already limited the significant figures, so this
+    only has to render: 9885.0 prints as '9885', not '9885.0' or '9.885e+03'.
+    A '%g' format would reach for exponential notation at 12 kHz, which is
+    inside our range.
+    """
+    return f"{fc:.2f}".rstrip('0').rstrip('.')
+
+
+def _filter_rows(filters):
+    return [f"| {i} | {f[0]} | {_freq_str(f[1])} | {f[2]:.2f} | {f[3]:.2f} |"
+            for i, f in enumerate(filters, 1)]
 
 
 TABLE_HEAD = [
@@ -443,11 +551,11 @@ def is_null_correction(result):
 
     Happens when the listening level equals the mastering reference: the ideal
     correction is identically zero, and the honest output is a sentence rather
-    than ten bands of 0.00 dB. The preset still ships, because a listener at
+    than five bands of 0.00 dB. The preset still ships, because a listener at
     their reference level needs to be told to apply nothing -- without it they
     would reach for the nearest rung and apply a correction they do not need.
     """
-    return all(abs(f[2]) < HOST_GAIN_PRECISION_DB / 2 for f in result['all'])
+    return all(abs(f[2]) < HOST_GAIN_PRECISION_DB / 2 for f in result['filters'])
 
 
 def write_markdown_table(result, level, ref_level, scale, headroom, filename):
@@ -488,36 +596,16 @@ def write_markdown_table(result, level, ref_level, scale, headroom, filename):
         "",
         f"**Headroom adjustment: {headroom:.1f} dB.** Apply this as a negative "
         "preamp / headroom setting. It is the worst case across "
-        f"{'/'.join(f'{r / 1000:g}' for r in VERIFY_RATES)} kHz and is safe for "
-        "either the essential five bands or all ten.",
+        f"{'/'.join(f'{r / 1000:g}' for r in VERIFY_RATES)} kHz.",
         "",
-        f"#### Essential — bands 1–5 (max residual error {result['error_essential']:.4f} dB)",
+        f"#### {BAND_COUNT} bands (max residual error {result['error']:.4f} dB)",
         "",
-        "A complete full-spectrum correction on its own. Enter these five and stop "
-        "if you like.",
-        "",
-    ]
-    lines += TABLE_HEAD + _filter_rows(result['essential']) + [""]
-    lines += [
-        f"#### Refinement — bands 6–10, optional "
-        f"(max residual error with all ten: {result['error_all']:.4f} dB)",
-        "",
-        "These reduce the residual error further. Compare the two traces in the "
-        "verification plot before deciding whether the extra entry is worth it.",
+        "A complete full-spectrum correction. The residual error is the deviation "
+        "these published, rounded values leave against the ideal ISO 226 target — "
+        "it is quoted for the numbers below, not for an unrounded fit behind them.",
         "",
     ]
-    if all(abs(f[2]) < HOST_GAIN_PRECISION_DB / 2 for f in result['refinement']):
-        lines += [
-            f"> **These bands round to 0.00 dB at the {HOST_GAIN_PRECISION_DB:.1f} dB "
-            "entry precision Roon and most DSPs accept, so typing them in by hand "
-            "changes nothing.** Five bands have already tracked the ISO 226 target "
-            "to well below audibility; there is no residual left for them to "
-            "correct. They are kept in the YAML because loading a file costs "
-            "nothing, and listed here so the claim can be checked rather than "
-            "taken on trust.",
-            "",
-        ]
-    lines += TABLE_HEAD + _filter_rows(result['refinement'], start=TIER_SIZE + 1) + [""]
+    lines += TABLE_HEAD + _filter_rows(result['filters']) + [""]
 
     content = "\n".join(lines)
     with open(filename, 'w', encoding='utf-8') as handle:
@@ -527,10 +615,10 @@ def write_markdown_table(result, level, ref_level, scale, headroom, filename):
 
 
 def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
-    """Write all ten bands as a CamillaDSP YAML file for direct REW import."""
+    """Write the band set as a CamillaDSP YAML file for direct REW import."""
     type_map = {LOW_SHELF: 'Lowshelf', HIGH_SHELF: 'Highshelf', PEAK: 'Peaking'}
     filters = {}
-    for i, (ftype, fc, gain, q_val) in enumerate(result['all'], 1):
+    for i, (ftype, fc, gain, q_val) in enumerate(result['filters'], 1):
         filters[f"band_{i}"] = {
             'type': 'Biquad',
             'parameters': {
@@ -560,9 +648,8 @@ def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
             f"# Headroom adjustment: {headroom:.1f} dB "
             f"(apply as negative preamp gain)",
             f"# Designed at {DESIGN_FS / 1000:.1f} kHz.",
-            f"# Bands 1-{TIER_SIZE} are a complete correction on their own "
-            f"(max error {result['error_essential']:.4f} dB);",
-            f"# bands {TIER_SIZE + 1}-10 refine it to {result['error_all']:.4f} dB.",
+            f"# {BAND_COUNT} bands, max residual error "
+            f"{result['error']:.4f} dB against the ideal ISO 226 target.",
             "",
         ]
     body = yaml.dump({'filters': filters}, sort_keys=False, default_flow_style=False)
@@ -572,7 +659,7 @@ def write_camilladsp_yaml(result, level, ref_level, scale, headroom, filename):
 
 
 def plot_frequency_response(result, level, ref_level, scale, headroom, filename):
-    """Plot essential-only and full responses against the ideal target."""
+    """Plot the published response against the ideal target."""
     # Imported lazily and deliberately: matplotlib costs about a second to
     # import, and nothing else in this module needs it. Hoisting it to the top
     # would slow every CLI invocation, including the ones that only print a
@@ -583,18 +670,16 @@ def plot_frequency_response(result, level, ref_level, scale, headroom, filename)
     import matplotlib.pyplot as plt
 
     freqs = np.logspace(np.log10(20), np.log10(20000), 2000)
-    resp5 = get_filter_response(result['essential'], freqs) + headroom
-    resp10 = get_filter_response(result['all'], freqs) + headroom
+    response = get_filter_response(result['filters'], freqs) + headroom
     target = np.interp(np.log10(freqs), np.log10(ISO_FREQ),
                        ideal_delta(level, ref_level, scale)) + headroom
 
     plt.figure(figsize=(12, 6))
     plt.semilogx(freqs, target, color='#7f7f7f', linewidth=3, alpha=0.45,
                  label='Ideal ISO 226 target')
-    plt.semilogx(freqs, resp10, color='#1f77b4', linewidth=2,
-                 label=f"All 10 bands (max error {result['error_all']:.4f} dB)")
-    plt.semilogx(freqs, resp5, color='#ff7f0e', linewidth=1.6, linestyle='--',
-                 label=f"Essential 5 bands (max error {result['error_essential']:.4f} dB)")
+    plt.semilogx(freqs, response, color='#1f77b4', linewidth=2,
+                 label=f"{BAND_COUNT} bands as published "
+                       f"(max error {result['error']:.4f} dB)")
 
     plt.axhline(0, color='#d62728', linestyle='--', linewidth=1.2,
                 label='Digital clipping limit (0 dB)')
@@ -615,8 +700,8 @@ def plot_frequency_response(result, level, ref_level, scale, headroom, filename)
     plt.ylabel('Amplitude (dB)')
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.xlim([20, 20000])
-    lo = min(np.min(resp10), np.min(resp5), headroom) - 1
-    plt.ylim([min(lo, -6), max(np.max(resp10) + 1, 2)])
+    lo = min(np.min(response), headroom) - 1
+    plt.ylim([min(lo, -6), max(np.max(response) + 1, 2)])
     plt.xticks([20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000],
                ['20', '50', '100', '200', '500', '1k', '2k', '5k', '10k', '20k'])
     plt.legend(loc='best', fontsize=9)
@@ -653,7 +738,7 @@ def main():
         return 1
 
     headroom = headroom_adjustment(result)
-    diag = cascade_diagnostics(result['all'])
+    diag = cascade_diagnostics(result['filters'])
     print(f"Cascade conditioning: final peak {diag['final_peak']:+.2f} dB, "
           f"worst intermediate stage {diag['stage_peak']:+.2f} dB, "
           f"total |gain| {diag['gain_sum']:.2f} dB, "

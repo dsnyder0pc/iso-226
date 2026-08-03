@@ -4,9 +4,10 @@ Generates parametric EQ (PEQ) filters that compensate for the way human hearing
 changes with playback level, so that a recording keeps the tonal balance its
 mastering engineer intended when you listen below the level it was mastered at.
 
-The filters track the **ISO 226 equal-loudness contours**. A verification tool
-checks the published filter values against the ideal contours and shows what the
-optional refinement bands actually buy.
+The filters track the **ISO 226 equal-loudness contours**. Each preset is five
+bands. A verification tool reads the published values back out and checks them
+against the ideal contours, so the accuracy claim can be tested rather than
+taken on trust.
 
 The equal-loudness arithmetic follows **ISO 226:2023** exactly — verified
 against the standard's own Annex B contours to within 0.05 dB, that table's full
@@ -108,8 +109,7 @@ python check.py --level <listening_db> [--reference <mastering_db>] [--scale <s>
 
 Reads the **published, rounded** filter values back out of the Markdown table,
 compares them against the ideal ISO 226 target, prints the maximum residual
-error for the essential five bands and for all ten, and saves
-`filter_<reference>_to_<level>_s<scale>_error.png` showing both traces.
+error, and saves `filter_<reference>_to_<level>_s<scale>_error.png`.
 
 ### Tests
 
@@ -119,12 +119,12 @@ python -m pytest tests/ -m "not slow"    # skip the tests that run the optimizer
 ```
 
 Most tests are fast. A handful are marked `slow` because they generate a real
-preset (~30 s) and then assert the properties that actually ship: that bands
-1–5 are exactly the first five of the ten, that no band exceeds the host's
-±12 dB limit, that adjacent bands stay far enough apart, that the extrapolation
-outside the ISO range stays bounded, and — the one that matters most — that the
-published headroom figure really does keep the response at or below 0 dBFS at
-every verified sample rate, for both the five-band and ten-band sets.
+preset (~30 s) and then assert the properties that actually ship: that no band
+exceeds the host's ±12 dB limit, that adjacent bands stay far enough apart, that
+the total gain budget holds, that the search returns values already at
+publication precision, that the extrapolation outside the ISO range stays
+bounded, and — the one that matters most — that the published headroom figure
+really does keep the response at or below 0 dBFS at every verified sample rate.
 
 Two of these tests exist because the obvious way to verify this project does not
 work.
@@ -228,58 +228,81 @@ be useful.
 
 ---
 
-## Choosing filters: five bands or ten
+## Why five bands
 
-Each generated preset contains ten bands in two groups:
+Each preset is five bands, and that is the whole correction — there is no
+optional extra set to decide about. Treble compensation is deliberately among
+the five rather than deferred: at low levels the loss of perceived treble
+matters at least as much as the loss of bass, particularly for listeners with
+age-related high-frequency loss.
 
-* **Bands 1–5, "Essential"** — a complete, standalone, full-spectrum correction.
-  Treble compensation is deliberately in this group, not deferred: at low levels
-  the loss of perceived treble matters at least as much as the loss of bass,
-  particularly for listeners with age-related high-frequency loss.
-* **Bands 6–10, "Refinement"** — optional.
+Five is not a compromise. The ISO 226 target is smooth, and five well-placed
+bands exhaust it:
 
-**The honest result: the refinement bands do essentially nothing.** Five
-well-placed bands track the ISO 226 target to better than 0.07 dB, and the ISO
-target is smooth enough that there is no structure left for five more bands to
-correct. Their gains come out around 0.00–0.03 dB, which **rounds to 0.0 dB at
-the 0.1 dB precision Roon accepts** — so typing them in by hand changes nothing
-at all.
+| Preset | Max residual error |
+| :--- | :--- |
+| 62 dB | 0.0925 dB |
+| 65 dB | 0.0535 dB |
+| 68 dB | 0.0417 dB |
+| 71 dB | 0.0486 dB |
+| 74 dB | 0.0265 dB |
+| 75 dB | 0.0320 dB |
+| 77 dB | 0.0284 dB |
+| 80 dB | 0.0217 dB |
+| 85 dB | 0.0171 dB |
+| 86 dB | 0.0192 dB |
+| 89 dB | 0.0229 dB |
 
-Across the shipped presets the second five change the worst-case error by under
-0.007 dB — a fraction of Roon's 0.1 dB entry precision, and smaller than the
-rounding on the numbers you would type. The figures below are measured on the
-dense fitting grid; evaluated instead at the 29 ISO preferred frequencies (what
-`check.py` reports and the error plots show) the two sets land within about
-0.001 dB of each other and the ordering sometimes reverses, which is itself a
-fair summary of how much the extra bands are worth:
+Measured on the dense fitting grid. Evaluated instead at the 29 ISO preferred
+frequencies — what `check.py` prints and the error plots show — the figures land
+slightly lower, because the sparser grid can miss where the worst deviation
+falls between ISO points.
 
-| Preset | Bands 1–5 | All 10 |
-| :--- | :--- | :--- |
-| 62 dB | 0.0984 dB | 0.0864 dB |
-| 65 dB | 0.0535 dB | 0.0506 dB |
-| 68 dB | 0.0783 dB | 0.0453 dB |
-| 71 dB | 0.0565 dB | 0.0437 dB |
-| 74 dB | 0.0666 dB | 0.0513 dB |
-| 75 dB | 0.0433 dB | 0.0432 dB |
-| 77 dB | 0.0462 dB | 0.0376 dB |
-| 80 dB | 0.0218 dB | 0.0197 dB |
-| 85 dB | 0.0172 dB | 0.0159 dB |
-| 86 dB | 0.0315 dB | 0.0197 dB |
-| 89 dB | 0.0532 dB | 0.0393 dB |
-
-The 62 dB preset is the loosest of the set, at 0.098 dB. That is expected: it
-sits against the 12 dB gain ceiling, so the optimizer has less freedom than
+The 62 dB preset is the loosest of the set. That is expected: it sits against
+the 12 dB per-band gain ceiling, so the optimizer has less freedom than
 elsewhere. It is still roughly two orders of magnitude below audibility.
 
-They are kept because loading a YAML file costs nothing, and published so the
-claim can be checked rather than taken on trust. The verification plot draws
-both traces with the difference shaded, so you can see the size of what you
-would be typing before deciding to type it.
+### What happened to bands 6–10
 
-For scale: the residual error either way is under 0.07 dB. In the listening test
-discussed below, subjects had to repeat their own judgement within **±6 dB** to
-qualify as consistent. This is what informed choice looks like — the plot is
-there so you can decide, rather than adding filters because more feels better.
+Earlier versions published a second group of five "refinement" bands. They were
+removed, because measurement showed they **changed the response by less than the
+rounding applied to publish them**.
+
+At the 0.1 dB gain precision hosts accept, the ten-band set was numerically
+identical to the five-band set in ten of the eleven presets, and the single
+exception was a rounding accident — two bands landing on exactly ±0.05 dB. The
+83→75 preset improved by **0.0001 dB** in exchange for five more filters typed
+by hand. Four of that preset's five refinement bands had also been pushed to the
+optimizer's minimum Q, which is what a fitter does when there is no residual
+left to work on and it parks the bands against a constraint.
+
+Asking anyone to enter five filters that provably do nothing is not a service,
+so they are gone from both the tables and the YAML.
+
+For scale on the numbers above: the residual error is under 0.10 dB everywhere
+and under 0.05 dB almost everywhere. In the listening test discussed below,
+subjects had to repeat their own judgement within **±6 dB** to qualify as
+consistent.
+
+### How the fit is chosen
+
+The optimizer is a local method run from many starting points, keeping the best
+result. Two details of that search are worth stating because they are easy to
+get wrong:
+
+* Candidates are scored on the **published, rounded** error, not on the
+  underlying fit. Scoring on the raw fit lets a candidate win that is better
+  before rounding and worse after — which is not hypothetical, it made one
+  preset 16% worse when the search was allowed to run longer.
+* A candidate is discarded unless the solver converged **and** the result
+  satisfies every constraint, so an unconverged fit that happens to look good
+  in-band cannot reach publication.
+
+Together these mean running the search longer can never make the published
+preset worse. The search stops when it reaches 0.05 dB, when further restarts
+stop finding anything better, or at a fixed ceiling. Two presets — 62 and 65 dB
+— do not reach 0.05 dB, and the generator says so rather than quietly shipping a
+number that missed. That is the honest limit of five bands at those levels.
 
 ---
 
@@ -373,9 +396,9 @@ APO's preamp, or your hardware DSP's input gain).
 
 That figure is:
 
-* the **worst case across 44.1 / 48 / 96 / 192 kHz** (see below),
-* valid for **either** the essential five bands or all ten, and
-* rounded away from zero to 0.1 dB, the precision Roon accepts.
+* the **worst case across 44.1 / 48 / 96 / 192 kHz** (see below), and
+* rounded away from zero to 0.1 dB — the preamp field is the one place Roon
+  really is limited to a single decimal.
 
 ### Gain limits on real hardware
 
@@ -422,11 +445,20 @@ pre-generated 83 dB-referenced presets exist for them.
 
 ## Generated Presets
 
-The essential five bands for the three headline levels, all referenced to
-83 dB. Errors here are evaluated at the 29 ISO preferred frequencies, matching
-the plots below and what `check.py` prints; the ladder table earlier uses the
-denser fitting grid, which is why the figures differ slightly. These are the values to type into Roon's Parametric EQ. The optional
-refinement bands are in the generated `.md` tables and in the YAML files; as discussed above, they round to 0.0 dB at Roon's entry precision.
+The three headline levels, all referenced to 83 dB. These are the values to type
+into Roon's Parametric EQ.
+
+Errors here are evaluated at the 29 ISO preferred frequencies, matching the
+plots below and what `check.py` prints; the ladder table earlier uses the denser
+fitting grid, which is why the figures differ slightly.
+
+Frequencies carry four significant figures, gain and Q two decimals. That is not
+arbitrary: Roon's collapsed filter list *renders* frequency as a whole number
+and gain to 0.1 dB, but it stores what you type — entering 100.4 Hz rather than
+100.0 Hz produces a visibly different response curve. So the published precision
+is set by what changes the response, not by what the interface echoes back. Q is
+the most sensitive of the three by roughly twenty times, which is why it keeps
+two decimals even though its values look small.
 
 ### Quiet — 65 dB
 
@@ -437,23 +469,23 @@ refinement bands are in the generated `.md` tables and in the YAML files; as dis
 | 1 | Low Shelf | 66.7 | +10.51 | 0.44 |
 | 2 | Peak | 301.9 | +3.06 | 0.25 |
 | 3 | Peak | 588.8 | −1.95 | 0.43 |
-| 4 | Peak | 3523.8 | −0.83 | 0.25 |
-| 5 | High Shelf | 10173.1 | +3.79 | 0.71 |
+| 4 | Peak | 3524 | −0.83 | 0.25 |
+| 5 | High Shelf | 10170 | +3.79 | 0.71 |
 
 ![65 dB frequency response](images/filter_83_to_65_s1.0.png)
 ![65 dB residual error](images/filter_83_to_65_s1.0_error.png)
 
 ### Moderate — 75 dB
 
-**Headroom adjustment `-4.2 dB`** · max residual error **0.0486 dB**
+**Headroom adjustment `-4.2 dB`** · max residual error **0.0311 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 120.0 | +4.53 | 0.34 |
-| 2 | Peak | 450.0 | −0.32 | 0.48 |
-| 3 | Peak | 1599.4 | +0.53 | 0.25 |
-| 4 | Peak | 3607.5 | −0.89 | 0.25 |
-| 5 | High Shelf | 10373.3 | +2.19 | 0.56 |
+| 1 | Low Shelf | 95 | +4.59 | 0.38 |
+| 2 | Peak | 320.8 | +0.35 | 0.25 |
+| 3 | Peak | 898.9 | −0.13 | 0.42 |
+| 4 | Peak | 2919 | −0.33 | 0.25 |
+| 5 | High Shelf | 10070 | +1.55 | 0.76 |
 
 ![75 dB frequency response](images/filter_83_to_75_s1.0.png)
 ![75 dB residual error](images/filter_83_to_75_s1.0_error.png)
@@ -462,15 +494,15 @@ refinement bands are in the generated `.md` tables and in the YAML files; as dis
 
 Above the 83 dB reference, so the correction is a slight *cut* at the extremes.
 
-**Headroom adjustment `-0.1 dB`** · max residual error **0.0163 dB**
+**Headroom adjustment `-0.1 dB`** · max residual error **0.0162 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Low Shelf | 39.3 | −1.75 | 0.26 |
+| 1 | Low Shelf | 39.29 | −1.75 | 0.26 |
 | 2 | Peak | 280.2 | −0.12 | 0.66 |
-| 3 | Peak | 927.0 | +0.01 | 0.39 |
-| 4 | Peak | 2910.3 | +0.07 | 0.40 |
-| 5 | High Shelf | 9868.3 | −0.32 | 0.88 |
+| 3 | Peak | 927 | +0.01 | 0.39 |
+| 4 | Peak | 2910 | +0.07 | 0.40 |
+| 5 | High Shelf | 9868 | −0.32 | 0.88 |
 
 ![85 dB frequency response](images/filter_83_to_85_s1.0.png)
 ![85 dB residual error](images/filter_83_to_85_s1.0_error.png)

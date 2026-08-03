@@ -29,7 +29,7 @@ filters:
     type: Biquad
     parameters:
       type: Peaking
-      freq: 2966.5
+      freq: 2966.0
       gain: 0.0
       q: 0.7
   band_5:
@@ -37,40 +37,5 @@ filters:
     parameters:
       type: Highshelf
       freq: 8124.0
-      gain: 0.0
-      q: 0.7
-  band_6:
-    type: Biquad
-    parameters:
-      type: Lowshelf
-      freq: 40.0
-      gain: 0.0
-      q: 0.7
-  band_7:
-    type: Biquad
-    parameters:
-      type: Peaking
-      freq: 154.9
-      gain: 0.0
-      q: 0.7
-  band_8:
-    type: Biquad
-    parameters:
-      type: Peaking
-      freq: 574.5
-      gain: 0.0
-      q: 0.7
-  band_9:
-    type: Biquad
-    parameters:
-      type: Peaking
-      freq: 2097.6
-      gain: 0.0
-      q: 0.7
-  band_10:
-    type: Biquad
-    parameters:
-      type: Highshelf
-      freq: 6633.2
       gain: 0.0
       q: 0.7

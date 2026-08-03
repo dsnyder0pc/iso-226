@@ -2,76 +2,40 @@
 # Mastering reference: 83 dB  (default) · listening level: 71 dB · scale: 1.00
 # Headroom adjustment: -6.3 dB (apply as negative preamp gain)
 # Designed at 44.1 kHz.
-# Bands 1-5 are a complete correction on their own (max error 0.0565 dB);
-# bands 6-10 refine it to 0.0437 dB.
+# 5 bands, max residual error 0.0486 dB against the ideal ISO 226 target.
 filters:
   band_1:
     type: Biquad
     parameters:
       type: Lowshelf
-      freq: 97.1
-      gain: 6.91
-      q: 0.37
+      freq: 90.74
+      gain: 6.9
+      q: 0.39
   band_2:
     type: Biquad
     parameters:
       type: Peaking
-      freq: 225.8
-      gain: 0.32
+      freq: 363.9
+      gain: 0.79
       q: 0.25
   band_3:
     type: Biquad
     parameters:
       type: Peaking
-      freq: 911.2
-      gain: 0.01
-      q: 0.45
+      freq: 1562.0
+      gain: -0.8
+      q: 0.25
   band_4:
     type: Biquad
     parameters:
       type: Peaking
-      freq: 2928.1
-      gain: -0.52
-      q: 0.25
+      freq: 2655.0
+      gain: 0.09
+      q: 1.0
   band_5:
     type: Biquad
     parameters:
       type: Highshelf
-      freq: 10115.2
-      gain: 2.36
-      q: 0.74
-  band_6:
-    type: Biquad
-    parameters:
-      type: Lowshelf
-      freq: 39.8
-      gain: -0.01
-      q: 2.0
-  band_7:
-    type: Biquad
-    parameters:
-      type: Peaking
-      freq: 154.9
-      gain: 0.01
-      q: 0.38
-  band_8:
-    type: Biquad
-    parameters:
-      type: Peaking
-      freq: 574.5
-      gain: 0.01
-      q: 0.25
-  band_9:
-    type: Biquad
-    parameters:
-      type: Peaking
-      freq: 2097.6
-      gain: -0.02
-      q: 0.25
-  band_10:
-    type: Biquad
-    parameters:
-      type: Highshelf
-      freq: 6633.2
-      gain: 0.01
-      q: 0.25
+      freq: 10170.0
+      gain: 2.18
+      q: 0.79

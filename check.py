@@ -4,8 +4,11 @@ Verification tool for equal-loudness compensation PEQ filter sets.
 
 Reads the published (rounded) filter values back out of the generated Markdown
 table and compares their response against the ideal ISO 226 target, plotting the
-residual error for the essential five bands and for all ten so a listener can
-see what the optional bands actually buy.
+residual error.
+
+This is the only check that does not share code with the thing it checks: the
+generator computes its published error from its own in-memory fit, whereas this
+reads the numbers a listener would actually type and evaluates those.
 """
 
 import argparse
@@ -34,14 +37,12 @@ _lf = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_lf)
 preset_stem = _lf.preset_stem
 
-ESSENTIAL_BANDS = 5
+# Imported rather than restated: the band count is part of the file format this
+# module parses, so the two must not be able to drift apart.
+BAND_COUNT = _lf.BAND_COUNT
+
 DEFAULT_REFERENCE = 83.0
 DEFAULT_SCALE = 1.0
-
-# Below this the optional bands are indistinguishable from fitting noise. For
-# scale, Roon accepts gains to 0.1 dB and listeners in the published listening
-# tests repeat their own judgements only to within several dB.
-NEGLIGIBLE_IMPROVEMENT_DB = 0.02
 
 
 def parse_markdown_filters(filepath):
@@ -104,19 +105,14 @@ def ensure_filter_file(level, ref, scale, md_filename):
                     '--reference', str(ref), '--scale', str(scale)], check=True)
 
 
-def plot_residual_error(err_essential, err_all, level, ref, scale, filename):
-    """Plot residual error for the essential five bands and for all ten."""
-    max_essential = float(np.max(np.abs(err_essential)))
-    max_all = float(np.max(np.abs(err_all)))
+def plot_residual_error(err, level, ref, scale, filename):
+    """Plot residual error for the published band set."""
+    max_err = float(np.max(np.abs(err)))
 
     plt.figure(figsize=(12, 6))
-    plt.fill_between(ISO_FREQ, err_essential, err_all,
-                     color='#9467bd', alpha=0.18,
-                     label='Difference made by bands 6–10')
-    plt.semilogx(ISO_FREQ, err_essential, 'o--', color='#ff7f0e', linewidth=1.8,
-                 markersize=4, label=f'Essential 5 bands (max {max_essential:.4f} dB)')
-    plt.semilogx(ISO_FREQ, err_all, 'o-', color='#1f77b4', linewidth=2,
-                 markersize=4, label=f'All 10 bands (max {max_all:.4f} dB)')
+    plt.semilogx(ISO_FREQ, err, 'o-', color='#1f77b4', linewidth=2,
+                 markersize=4,
+                 label=f'Published filter set (max {max_err:.4f} dB)')
     plt.axhline(0, color='black', linestyle='--', alpha=0.7)
 
     level_str = f"{int(level)}" if float(level).is_integer() else f"{level}"
@@ -130,7 +126,7 @@ def plot_residual_error(err_essential, err_all, level, ref, scale, filename):
     plt.ylabel('Deviation Error (dB)')
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.xlim([20, 12500])
-    span = max(max_essential, max_all, 0.05) * 1.6
+    span = max(max_err, 0.05) * 1.6
     plt.ylim([-span, span])
     plt.legend(loc='best')
     plt.tight_layout()
@@ -172,28 +168,22 @@ def main():
               "the ideal correction is 0.00 dB at every frequency.")
         print("No filters to verify.")
         return 0
-    if len(filters) < ESSENTIAL_BANDS:
-        print(f"Error: '{md_filename}' contains only {len(filters)} filter rows.",
-              file=sys.stderr)
+    if not filters:
+        print(f"Error: '{md_filename}' contains no filter rows.", file=sys.stderr)
         return 1
+    if len(filters) != BAND_COUNT:
+        # Not fatal: verify whatever the file actually publishes. A mismatch
+        # usually means the file predates a change to the band count.
+        print(f"Warning: '{md_filename}' publishes {len(filters)} bands, but the "
+              f"generator now produces {BAND_COUNT}. Verifying the file as it is.")
 
     target = ideal_delta(args.level, ref, scale)
-    err_essential = get_filter_response(filters[:ESSENTIAL_BANDS], ISO_FREQ) - target
-    err_all = get_filter_response(filters, ISO_FREQ) - target
+    err = get_filter_response(filters, ISO_FREQ) - target
+    max_err = float(np.max(np.abs(err)))
+    print(f"Max residual error, {len(filters)} bands as published: "
+          f"{max_err:.4f} dB")
 
-    max_essential = float(np.max(np.abs(err_essential)))
-    max_all = float(np.max(np.abs(err_all)))
-    delta = max_essential - max_all
-    print(f"Max residual error, essential 5 bands: {max_essential:.4f} dB")
-    print(f"Max residual error, all 10 bands:      {max_all:.4f} dB")
-    print(f"Change from adding bands 6-10:         {delta:+.4f} dB")
-    if abs(delta) < NEGLIGIBLE_IMPROVEMENT_DB:
-        print("  -> within fitting noise. Five bands have already tracked the "
-              "target as closely as this topology can;")
-        print("     entering bands 6-10 by hand is not worth the effort.")
-
-    plot_residual_error(err_essential, err_all, args.level, ref, scale,
-                        plot_filename)
+    plot_residual_error(err, args.level, ref, scale, plot_filename)
     return 0
 
 

@@ -21,8 +21,8 @@ python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 python check.py --level <db> [--reference <db>] [--scale <s>]
 
 # Regression tests — run after touching any math
-python -m pytest tests/                  # all 60 (~31 s)
-python -m pytest tests/ -m "not slow"    # 52 fast ones (~2 s)
+python -m pytest tests/                  # all 66 (~30 s)
+python -m pytest tests/ -m "not slow"    # 55 fast ones (~2 s)
 
 # Rebuild every committed preset and figure (several minutes)
 python regenerate.py
@@ -43,9 +43,10 @@ Tests marked `slow` share one session-scoped `preset` fixture that runs the
 optimizer once (~30 s) and assert many shipped properties against it. Add new
 integration assertions to that fixture rather than generating another preset.
 
-A generator run takes ~30 s (constrained minimax with multistart). Batch
-regeneration of the whole preset ladder takes several minutes — run it in the
-background.
+A generator run takes 20–45 s (constrained minimax, multistart). Runtime is
+data-dependent now: the search stops when it reaches its target, stagnates, or
+hits `MAX_RESTARTS`, so a hard level like 62 dB costs twice an easy one. Batch
+regeneration of the whole ladder is ~5.5 minutes — run it in the background.
 
 **Environment note:** the project uses a pyenv virtualenv named `iso-226`
 (`.python-version`), which auto-activates only inside the project directory.
@@ -79,9 +80,27 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     `|error| <= t`). Do not "simplify" this back to handing `np.max(np.abs(...))`
     to SLSQP — that function is non-differentiable at the optimum and fits 3–5×
     worse.
-  - `calculate_filters(...)`: fits tier 1 (bands 1–5), rounds it, then fits
-    tier 2 (bands 6–10) **on top of the frozen, rounded tier 1**, so the
-    essential five are exactly the best standalone five-band solution.
+  - `calculate_filters(...)`: fits one set of `BAND_COUNT` (5) bands. Returns
+    `{'filters', 'error', 'restarts', 'target_met'}`, with `filters` already at
+    publication precision and `error` measured from those rounded values.
+  - **Multistart selection is on the *published* error, not the raw fit**, and
+    an attempt is rejected unless SLSQP converged *and* the returned point
+    satisfies every constraint. Both rules matter: scoring on the raw fit let a
+    restart win that was better before rounding and worse after, which made the
+    62 dB preset 16% worse (0.0986 → 0.1140 dB) when restarts were increased.
+    Together they make best-so-far monotonic, so running the search longer can
+    never degrade the result — which the target-driven loop depends on.
+  - Search stops on the `PUBLISHED_ERROR_TARGET_DB` (0.05) target, on
+    `STAGNATION_LIMIT` consecutive non-improving restarts, or at `MAX_RESTARTS`.
+    Missing the target is reported, not hidden; 62–65 dB do not reach it and
+    that is the honest limit of five bands, not a bug.
+  - `publication_round(...)`: frequency to **4 significant figures**, gain and Q
+    to 2 decimals. Frequency uses significant figures because its sensitivity is
+    fractional — measured per band, the high shelf is the most demanding in the
+    set (0.08% at 9.9 kHz, because it carries the gain), while low-gain interior
+    peaks tolerate 1–2%. A fixed decimal count is the wrong shape for a column
+    spanning three decades. Q is the sensitive parameter by ~20× and sets the
+    floor under the whole format; a third gain decimal buys nothing beneath it.
   - `cascade_diagnostics(...)`: worst intermediate stage gain and quantization
     sensitivity. Guards against degenerate near-cancelling band pairs.
   - `check_budget(...)`: refuses over-budget requests with computed `--scale`
@@ -89,7 +108,7 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     the failed fit's peak).
 
 - **`check.py`** — parses the **published, rounded** values back out of the
-  Markdown table and plots residual error for bands 1–5 versus all 10. It
+  Markdown table and plots residual error for the published set. It
   imports `preset_stem` from the generator so both agree on filenames, and
   shells out to generate the preset if that file does not exist yet.
 
@@ -152,10 +171,18 @@ lives in `regenerate.py` — so this applies to anything new.)
   parses back, and mapped in the YAML writer. Changing one requires all three.
 - **Per-band gain is capped at ±12 dB** (Roon MUSE PEQ slider; miniDSP is ±16,
   so 12 satisfies both), plus a total-absolute-gain budget and non-overlapping
-  per-tier frequency ranges. These exist to prevent degenerate solutions with
+  per-band frequency ranges. These exist to prevent degenerate solutions with
   two large opposing filters at nearly the same frequency — which measure fine
   end-to-end but overflow intermediate nodes in serial fixed-point DSPs and lose
   their cancellation under host coefficient quantization.
+- **`BAND_FC_BOUNDS` is hand-tuned and earns it.** Replacing it with even log
+  spacing over the same range costs a factor of five in published error
+  (0.027 → 0.133 dB at 83 → 74 dB). Do not "regularize" it.
+- **`cascade_diagnostics` inspects frequency-adjacent pairs**, so inserting
+  near-zero-gain bands between the real ones silently neutralizes
+  `opposing_neighbours`. The old refinement tier did exactly that: the 65 dB set
+  read 0.100 across ten bands and 2.023 across the five doing the work. If a
+  band count ever changes again, recheck that threshold against real values.
 - **No filter band above 12 kHz.** A 16 kHz shelf extrapolates past the ISO data
   with no evidence behind it, and it is where the residual sample-rate
   dependence lives: the previous version's response at 20 kHz ranged from
@@ -164,7 +191,7 @@ lives in `regenerate.py` — so this applies to anything new.)
   coefficient bug, not a real rate effect.)
 - **Design and analyse at 44.1 kHz**, verify headroom across all `VERIFY_RATES`,
   and publish the worst case rounded *away from zero* to 0.1 dB (Roon's entry
-  precision). One headroom number covers both the 5- and 10-band sets.
+  precision, and the one field where Roon really is limited to one decimal).
 - **Out-of-band regions are constrained, not optimized.** Keep the target
   flat-held below 20 Hz and above 12.5 kHz with `EXTRAP_TOLERANCE_DB`; this is
   what keeps subsonic gain bounded.
@@ -190,7 +217,25 @@ lives in `regenerate.py` — so this applies to anything new.)
 - A measurement-convention offset shared by both cancels to first order
   (<0.05 dB); a 6 dB error in `--level` alone costs ~3.15 dB. Optimize for
   repeatability of the measurement, not for fit precision.
-- The refinement bands (6–10) typically come out at 0.01–0.03 dB, below Roon's
-  0.1 dB entry precision. This is expected — the ISO target is smooth enough
-  that five bands exhaust it. The generator says so in the Markdown output when
-  it is true; do not "fix" it by making tier 1 artificially worse.
+- **Five bands exhaust the ISO target; do not add a second tier back.** The
+  removed refinement bands came out at 0.01–0.03 dB, and across the whole
+  committed ladder they changed the response by *less than the rounding applied
+  to publish them* — at 0.1 dB gain entry the ten-band set was numerically
+  identical to the five-band set in ten of eleven presets, and the one exception
+  was a rounding accident (two bands at exactly ±0.05). The 83→75 preset
+  improved by 0.0001 dB for five extra filter entries, with four of its five
+  refinement bands pinned at `MIN_Q` — the optimizer parking bands against a
+  constraint because there was no residual left to work on.
+- **Band count is not the lever people expect.** With adequate multistart, a
+  jointly-fitted 8-band set beats 5 bands by 0.0046 dB raw — well under the
+  0.014–0.017 dB the publication rounding costs, so it is invisible in the
+  artifact. Search quality dominates: at 83→74 dB, going from 4 to 20 restarts
+  improved the published error by 41% (0.0654 → 0.0384 dB). But that is
+  level-dependent — 83→62 dB lands in the same basin on every restart, so
+  multistart buys it nothing and its ~0.09 dB is a structural limit.
+- **Roon renders more coarsely than it stores.** Its collapsed filter list shows
+  integer Hz, 0.1 dB and 0.01 Q, but entering 100.4 Hz versus 100.0 Hz produces
+  a visibly different response curve, so the full float survives. Publication
+  precision is therefore chosen from what changes the response, not from what
+  the UI echoes back. The preamp/headroom field is the genuine exception at
+  `%.1f`.

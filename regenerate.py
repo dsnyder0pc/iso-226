@@ -68,8 +68,15 @@ IMAGES_DIR = os.path.join(HERE, "images")
 
 
 def _quiet(func, *args, **kwargs):
-    """Call func with stdout swallowed; the writers print their own tables."""
-    with contextlib.redirect_stdout(io.StringIO()):
+    """Call func with its own output swallowed.
+
+    The writers print their tables to stdout and the generator reports fit
+    progress to stderr. Both are useful for a single CLI run and both would
+    shred the one-line-per-preset status this script prints, so each call is
+    silenced and the interesting figures are re-reported from the result.
+    """
+    with contextlib.redirect_stdout(io.StringIO()), \
+            contextlib.redirect_stderr(io.StringIO()):
         return func(*args, **kwargs)
 
 
@@ -78,7 +85,7 @@ def generate(level, with_figures):
     stem = lf.preset_stem(level, REFERENCE, SCALE)
     started = time.perf_counter()
 
-    result = lf.calculate_filters(float(level), REFERENCE, SCALE)
+    result = _quiet(lf.calculate_filters, float(level), REFERENCE, SCALE)
     lf.check_budget(result, float(level), REFERENCE, SCALE)
     headroom = lf.headroom_adjustment(result)
 
@@ -91,10 +98,8 @@ def generate(level, with_figures):
         _quiet(lf.plot_frequency_response, result, float(level), REFERENCE,
                SCALE, headroom, os.path.join(IMAGES_DIR, f"{stem}.png"))
         target = ideal_delta(float(level), REFERENCE, SCALE)
-        essential = result["essential"]
         _quiet(checker.plot_residual_error,
-               get_filter_response(essential, ISO_FREQ) - target,
-               get_filter_response(result["all"], ISO_FREQ) - target,
+               get_filter_response(result["filters"], ISO_FREQ) - target,
                float(level), REFERENCE, SCALE,
                os.path.join(IMAGES_DIR, f"{stem}_error.png"))
 
@@ -139,15 +144,24 @@ def main():
           f"scale {SCALE:g}.")
     print("Half a minute or so each, depending on the machine.\n")
 
-    total = 0.0
+    total, missed = 0.0, False
     for index, level in enumerate(levels, 1):
         label = f"[{index}/{len(levels)}] {REFERENCE:g} -> {level} dB"
         print(f"  {label:<28}", end=" ", flush=True)
         headroom, result, elapsed = generate(level, level in FEATURED)
         total += elapsed
+        missed = missed or not result['target_met']
         print(f"headroom {headroom:+5.1f} dB   "
-              f"err {result['error_essential']:.4f}/{result['error_all']:.4f} dB   "
+              f"err {result['error']:.4f} dB"
+              f"{' ' if result['target_met'] else '*'}  "
+              f"{result['restarts']:2d} restarts   "
               f"({elapsed:4.1f} s)")
+
+    if missed:
+        print(f"\n  * did not reach the {lf.PUBLISHED_ERROR_TARGET_DB:g} dB "
+              f"target. That is the honest limit of {lf.BAND_COUNT} bands at "
+              "those levels, not a failure;\n    the residual is still far "
+              "below audibility.")
 
     print(f"\nDone in {total / 60:.1f} minutes.")
     print(f"  REW/    {2 * len(levels)} files")
