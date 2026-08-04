@@ -209,6 +209,8 @@ bands exhaust it:
 
 | Preset | Max residual error |
 | :--- | :--- |
+| 60 dB | 0.2083 dB |
+| 61 dB | 0.1755 dB |
 | 62 dB | 0.0925 dB |
 | 65 dB | 0.0535 dB |
 | 68 dB | 0.0417 dB |
@@ -226,9 +228,12 @@ frequencies — what `check.py` prints and the error plots show — the figures 
 slightly lower, because the sparser grid can miss where the worst deviation
 falls between ISO points.
 
-The 62 dB preset is the loosest of the set. That is expected: it sits against
-the 12 dB per-band gain ceiling, so the optimizer has less freedom than
-elsewhere. It is still roughly two orders of magnitude below audibility.
+The three quietest presets are the loosest of the set, and 60 dB is the
+loosest of those. That is expected: they sit against the 12 dB per-band gain
+ceiling — the low shelf in the 60 and 61 dB sets is pinned exactly to it — so
+the optimizer has less freedom than elsewhere. All three are still well below
+audibility, but they are not representative of the set: from 65 dB upward the
+residual is under 0.06 dB.
 
 ### What happened to bands 6–10
 
@@ -268,9 +273,10 @@ get wrong:
 
 Together these mean running the search longer can never make the published
 preset worse. The search stops when it reaches 0.05 dB, when further restarts
-stop finding anything better, or at a fixed ceiling. Two presets — 62 and 65 dB
-— do not reach 0.05 dB, and the generator says so rather than quietly shipping a
-number that missed. That is the honest limit of five bands at those levels.
+stop finding anything better, or at a fixed ceiling. Four presets — 60, 61, 62
+and 65 dB — do not reach 0.05 dB, and the generator says so rather than quietly
+shipping a number that missed. That is the honest limit of five bands at those
+levels.
 
 ---
 
@@ -283,6 +289,8 @@ files for an 83 dB mastering reference are in the [REW](REW) directory:
 
 | File | Listening level | Relative to reference |
 | :--- | :--- | :--- |
+| [filter_83_to_60_s1.0](REW/filter_83_to_60_s1.0.yml) | 60 dB — the floor | −23 dB |
+| [filter_83_to_61_s1.0](REW/filter_83_to_61_s1.0.yml) | 61 dB | −22 dB |
 | [filter_83_to_62_s1.0](REW/filter_83_to_62_s1.0.yml) | 62 dB — very quiet | −21 dB |
 | [filter_83_to_65_s1.0](REW/filter_83_to_65_s1.0.yml) | 65 dB — quiet | −18 dB |
 | [filter_83_to_68_s1.0](REW/filter_83_to_68_s1.0.yml) | 68 dB | −15 dB |
@@ -309,8 +317,16 @@ recording was mastered for, so the correct answer is to apply nothing. It ships
 as an explicit rung because reaching for the nearest neighbour instead would
 apply roughly 1.6 dB of correction you do not want.
 
-62 dB is the quietest preset possible at an 83 dB reference: below that the
-correction needs more than the 12 dB Roon allows.
+60 dB is the quietest preset possible at an 83 dB reference: at 59 dB the
+fitted cascade needs 12.35 dB, more than the 12 dB Roon allows, and the
+generator refuses.
+
+If you ask for something below the floor, the generator's suggested `--level`
+is 62 rather than 60. That is deliberate rather than a mistake: it estimates
+from the peak of the ideal target instead of running a fit it has not run yet,
+so every level it suggests is one that is certain to work. 60 and 61 dB are the
+two levels where the estimate and the actual fit disagree, and they ship
+because the fit is what matters.
 
 #### These files also work for other mastering references
 
@@ -324,6 +340,8 @@ So each file above serves any reference at the same offset:
 
 | File | offset | ref 72 | ref 75 | ref 78 | ref 80 | ref 83 | ref 85 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `..._to_60_...` | −23 | 49 | 52 | 55 | 57 | **60** | 62 |
+| `..._to_61_...` | −22 | 50 | 53 | 56 | 58 | **61** | 63 |
 | `..._to_62_...` | −21 | 51 | 54 | 57 | 59 | **62** | 64 |
 | `..._to_65_...` | −18 | 54 | 57 | 60 | 62 | **65** | 67 |
 | `..._to_68_...` | −15 | 57 | 60 | 63 | 65 | **68** | 70 |
@@ -375,9 +393,9 @@ Roon's MUSE Parametric EQ gain control spans **+12 to −12 dB**. miniDSP allows
 required attenuation at **12 dB**, which satisfies both platforms.
 
 This creates a real floor. At an 83 dB reference, full compensation needs more
-than 12 dB below roughly **62 dB SPL** — so 55 and 60 dB presets referenced to
-83 dB cannot be built, and none are shipped. If you ask for one, the generator
-refuses and suggests a `--scale` value and a `--level` that would fit:
+than 12 dB below **60 dB SPL** — so a 55 dB preset referenced to 83 dB cannot
+be built, and none is shipped. If you ask for one, the generator refuses and
+suggests a `--scale` value and a `--level` that would fit:
 
 ```
 Error: Cannot build a usable filter set for --level 50 --reference 83: the

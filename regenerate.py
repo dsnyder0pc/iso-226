@@ -46,16 +46,27 @@ checker = _load("checker", "check.py")
 REFERENCE = 83.0        # the Katz monitoring convention; see the README
 SCALE = 1.0             # full theoretical correction
 
-# 3 dB steps across the usable range. 62 dB is the floor: below it the
-# correction needs more than the 12 dB a host PEQ can apply. 89 dB is three
-# steps above the reference, past which the correction is a slight cut.
+# 3 dB steps across the usable range, plus the two rungs below the grid that
+# still fit. 89 dB is three steps above the reference, past which the
+# correction is a slight cut.
+#
+# 60 dB is the floor, not 62: at 59 dB the fitted cascade needs 12.35 dB and is
+# refused. The generator's own --level suggestion still says 62, because
+# suggest_alternatives estimates from the peak of the *target* rather than from
+# a fit it has not run -- deliberately conservative, so that a suggestion it
+# makes is always one that works. 60 and 61 are the levels where those two
+# measures disagree, and they ship because they do fit.
+#
+# They are the loosest presets in the set: 0.21 and 0.18 dB residual against
+# 0.09 at 62 dB, with the low shelf pinned to the 12 dB cap. Still well below
+# audibility, but do not read them as typical.
 #
 # A listener whose measured level falls between two rungs snaps to the nearer
 # one and loses at most ~0.8 dB, which sits inside the uncertainty of their own
 # SPL measurement. Because the correction depends on (level - reference) rather
 # than on either level alone, these same files serve every mastering reference
 # from 72 to 85 dB -- see the equivalence table in the README.
-LADDER = [62, 65, 68, 71, 74, 77, 80, 83, 86, 89]
+LADDER = [60, 61, 62, 65, 68, 71, 74, 77, 80, 83, 86, 89]
 
 # Not on the 3 dB grid, but they are the levels the README and the article use
 # as illustrations, so they ship too rather than leaving those examples

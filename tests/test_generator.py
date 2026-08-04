@@ -10,6 +10,7 @@ The slow tests run the optimizer. Skip them with `-m "not slow"`.
 """
 
 import os
+import re
 import sys
 
 import numpy as np
@@ -23,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from check import parse_markdown_filters, parse_markdown_metadata  # noqa: E402
 from iso226_utils import (  # noqa: E402
     EXTRAP_TOLERANCE_DB, VERIFY_RATES, Compensation, build_target,
-    get_filter_response, ideal_delta,
+    get_filter_response, ideal_delta, peak_gain,
 )
 
 # A hand-built result standing in for a generated one, so the format tests stay
@@ -313,3 +314,62 @@ def test_published_headroom_prevents_clipping_at_every_rate(lf, preset):
     for rate in VERIFY_RATES:
         peak = np.max(get_filter_response(preset['filters'], grid, rate)) + headroom
         assert peak <= 0.0
+
+
+# --- The shipped ladder -----------------------------------------------------
+# Everything above tests the generator. These test what is actually committed
+# in REW/, which is what users download and what the README makes claims
+# about. They are fast: parsing and a frequency response, no fitting. Nothing
+# else notices when a shipped preset drifts out of budget, or when the README
+# and the files disagree about where the floor is.
+
+def _committed_presets():
+    """Every preset markdown file in REW/, as (stem, path) pairs."""
+    rew = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "REW")
+    return sorted((os.path.splitext(name)[0], os.path.join(rew, name))
+                  for name in os.listdir(rew) if name.endswith(".md"))
+
+
+@pytest.mark.parametrize("stem,path", _committed_presets())
+def test_committed_preset_fits_the_headroom_budget(lf, stem, path):
+    """No shipped preset may need more headroom than a host PEQ can give.
+
+    The floor is emergent -- check_budget refuses whatever does not fit -- so
+    the only thing standing between a bad ladder entry and a user is this.
+
+    The reference rung carries no filters at all (listening at the mastering
+    level needs no correction), which is a valid preset and not an empty one.
+    """
+    filters = parse_markdown_filters(path)
+    if not filters:
+        with open(path, encoding="utf-8") as handle:
+            assert "No Compensation Needed" in handle.read(), (
+                f"{stem} has no filter table and does not say why")
+        return
+    assert peak_gain(filters) <= lf.MAX_HEADROOM + 1e-9, (
+        f"{stem} needs more than {lf.MAX_HEADROOM:g} dB of headroom")
+
+
+@pytest.mark.parametrize("stem,path", _committed_presets())
+def test_committed_preset_publishes_its_own_headroom(stem, path):
+    """The printed headroom must match the filters printed beside it.
+
+    Published away from zero to 0.1 dB, so it may exceed the computed peak by
+    up to that rounding but must never fall short of it -- a short figure
+    clips.
+    """
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    if not parse_markdown_filters(path):
+        assert "no headroom adjustment" in text.lower(), (
+            f"{stem} has no filters but does not say headroom is unnecessary")
+        return
+    match = re.search(r"Headroom adjustment:\s*(-?[0-9.]+)\s*dB", text)
+    assert match, f"{stem} does not publish a headroom figure"
+    published = float(match.group(1))
+    computed = peak_gain(parse_markdown_filters(path))
+    assert -published >= computed - 1e-9, (
+        f"{stem} publishes {published} dB but needs {-computed:.4f} dB")
+    assert -published - computed <= 0.1 + 1e-9, (
+        f"{stem} publishes {published} dB, more than 0.1 dB of slack")

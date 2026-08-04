@@ -108,7 +108,7 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     never degrade the result — which the target-driven loop depends on.
   - Search stops on the `PUBLISHED_ERROR_TARGET_DB` (0.05) target, on
     `STAGNATION_LIMIT` consecutive non-improving restarts, or at `MAX_RESTARTS`.
-    Missing the target is reported, not hidden; 62–65 dB do not reach it and
+    Missing the target is reported, not hidden; 60–65 dB do not reach it and
     that is the honest limit of five bands, not a bug.
   - `publication_round(...)`: frequency to **4 significant figures**, gain and Q
     to 2 decimals. Frequency uses significant figures because its sensitivity is
@@ -238,10 +238,29 @@ lives in `regenerate.py` — so this applies to anything new.)
   built by `preset_stem()` in `loudness-filters.py` and imported by `check.py`.
   Both levels are in the name because the curve is defined by the pair; scale is
   in the name so taste variants coexist.
-- **`REW/` holds committed presets** for 62–90 dB @ 83 dB reference. 62 dB is
-  the floor — below it the correction exceeds the 12 dB budget. `.gitignore`
-  anchors `/filter_*` to the repo root, so root-level output is scratch while
-  `REW/*.yml` and `images/*.png` stay tracked.
+- **`REW/` holds committed presets** for 60–90 dB @ 83 dB reference. **60 dB is
+  the floor**, not 62: at 59 dB the fitted cascade needs 12.35 dB and
+  `check_budget` refuses it. `.gitignore` anchors `/filter_*` to the repo root,
+  so root-level output is scratch while `REW/*.yml` and `images/*.png` stay
+  tracked.
+- **The floor and the suggested `--level` disagree by 2 dB, deliberately.**
+  `suggest_alternatives` estimates from the peak of the *target* rather than
+  from a fit it has not run, so it says 62 where 60 in fact fits. Do not
+  "correct" it to 60: the conservatism is what makes every suggestion it emits
+  one that actually works, which `test_suggestions_actually_fit_the_budget`
+  asserts. The gap is documented in the README instead.
+
+  This gap is also *how* "62 dB is the floor" became documentation. The ladder
+  comment in `regenerate.py` was written in `f553cae`, after
+  `suggest_alternatives` landed in `3660d1b`, and restated that function's
+  output as an empirical fact — nobody ever fitted 61 or 60. The generator's
+  advice is conservative by design; do not promote it to a measurement. When a
+  limit matters, fit it and look at the result.
+- **60 and 61 dB are the loosest presets in the set** — 0.2083 and 0.1755 dB
+  residual against 0.0925 at 62 dB, with the low shelf pinned exactly to the
+  12 dB cap. They ship because they fit, but they are not representative; from
+  65 dB up the residual is under 0.06 dB. If a future change makes the deep end
+  cheaper, recheck whether 59 dB comes into range too.
 - **One ladder covers every reference.** The compensation curve depends on
   `level - reference`, not on the two separately (≤0.125 dB across references
   72–85 dB). The README carries the equivalence table; do not generate a
