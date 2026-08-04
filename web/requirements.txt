@@ -1,0 +1,8 @@
+# Runtime dependencies for the API only.
+#
+# Deliberately does NOT include numpy or scipy. The fitting happens offline in
+# precompute_presets.py on a development machine; this service reads the
+# resulting JSON and does dictionary lookups. That keeps the deployed footprint
+# around 30 MB instead of 110 MB, which matters on a 1 GB droplet.
+flask>=3.0
+gunicorn>=21.2
