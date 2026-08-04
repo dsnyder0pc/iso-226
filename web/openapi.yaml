@@ -1,0 +1,493 @@
+openapi: 3.1.0
+
+info:
+  title: Equal-Loudness Compensation Filter API
+  version: "1"
+  summary: >-
+    Returns parametric-EQ filter sets that compensate for the level-dependence
+    of human hearing, based on the ISO 226:2023 equal-loudness contours.
+  description: |
+    ## What this is for
+
+    Human hearing is not equally sensitive at all frequencies, and the shape of
+    that sensitivity changes with level. A recording mastered at 83 dB SPL and
+    played back at 65 dB loses perceived bass and treble relative to the
+    midrange, so it sounds thin. This API returns a small set of parametric EQ
+    filters that restore the intended tonal balance at the quieter level.
+
+    A client sends the **measured** listening level and gets back five filter
+    bands plus a mandatory headroom figure.
+
+    ## The two levels are different things
+
+    - `level` — the listener's **measured** sound pressure level, in dB SPL,
+      measured broadband, C-weighted, slow. A phone SPL meter is accurate
+      enough. This is a property of the room and the volume knob.
+    - `reference` — the level the **recording** was mastered at. A property of
+      the recording, not of playback. 83 dB is the common convention and the
+      default. Users generally do not know this and should usually leave it.
+
+    They are not interchangeable. Only their difference matters: `level` minus
+    `reference` selects the curve, so 65/83 and 57/75 return identical filters.
+
+    ## Applying the result
+
+    The `filters` array is ordered by band and maps directly onto RBJ Audio EQ
+    Cookbook biquads, which is what Roon, CamillaDSP, miniDSP, Equalizer APO
+    and REW all implement. Each entry gives `type`, `frequency` (Hz), `gain`
+    (dB) and `q`.
+
+    **`status.preset.headroom_db` is not advisory.** It is negative, and it is
+    the worst-case peak of the filter cascade across 44.1/48/96/192 kHz. It
+    must be applied as a negative preamp or gain-offset. A client that displays
+    the filters without prominently displaying the headroom will cause clipping.
+
+    ## Building a UI against this
+
+    Call `GET /v1/meta` first. It reports `coverage.offset_range_db`, the range
+    of `level - reference` that can actually be served. For a chosen
+    `reference`, the valid level range is:
+
+        reference + offset_range_db[0]  ..  reference + offset_range_db[1]
+
+    With the default 83 dB reference and the current grid, that is 60 to 90 dB.
+    Bound the level control to that range and most errors become unreachable.
+
+    Levels are served on a 1 dB grid. A request for 65.4 dB is snapped to 65 and
+    a note says so; this is not an error.
+
+    ## Response shape
+
+    Every response — success, client error, server error — has exactly two
+    top-level keys, `status` and `filters`. On error `filters` is `[]`. A client
+    can branch on `status.ok` and never encounter a shape it has not seen.
+
+  license:
+    name: MIT
+  contact:
+    url: https://github.com/dsnyder0pc/iso-226
+
+servers:
+  - url: https://example.org
+    description: Replace with the deployment host.
+
+paths:
+  /v1/filters:
+    get:
+      operationId: getFilters
+      summary: Get the filter set for a listening level.
+      description: |
+        Unknown query parameters are ignored. Numbers may be written with or
+        without a sign or decimal part; exponent notation is rejected.
+      parameters:
+        - name: level
+          in: query
+          required: true
+          description: >-
+            Measured listening level in dB SPL (broadband, C-weighted, slow).
+          schema:
+            type: number
+            minimum: 20
+            maximum: 120
+            examples: [65]
+        - name: reference
+          in: query
+          required: false
+          description: >-
+            Level the recording was mastered at, in dB SPL. Defaults to 83.
+          schema:
+            type: number
+            minimum: 50
+            maximum: 100
+            default: 83
+        - name: scale
+          in: query
+          required: false
+          description: |
+            Fraction of the theoretical correction to apply. **Version 1 serves
+            full compensation only**; any other value returns 422
+            `scale_unavailable`. Omit it.
+          schema:
+            type: number
+            minimum: 0.1
+            maximum: 1.0
+            default: 1.0
+      responses:
+        "200":
+          description: A filter set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilterResponse"
+              examples:
+                quiet:
+                  summary: 65 dB against the default 83 dB reference
+                  value:
+                    status:
+                      ok: true
+                      request: {level: 65.0, reference: 83.0, scale: 1.0}
+                      resolved: {offset_db: -18, scale: 1.0}
+                      preset:
+                        band_count: 5
+                        design_fs: 44100.0
+                        headroom_db: -9.5
+                        max_residual_db: 0.0535
+                        target_met: false
+                      source:
+                        api_version: "1"
+                        iso_edition: "ISO 226:2023"
+                        generated_utc: "2026-08-04T22:57:32+00:00"
+                      notes: []
+                    filters:
+                      - {band: 1, type: Low Shelf,  frequency: 66.7,    gain: 10.51, q: 0.44}
+                      - {band: 2, type: Peak,       frequency: 301.9,   gain: 3.06,  q: 0.25}
+                      - {band: 3, type: Peak,       frequency: 588.8,   gain: -1.95, q: 0.43}
+                      - {band: 4, type: Peak,       frequency: 3524.0,  gain: -0.83, q: 0.25}
+                      - {band: 5, type: High Shelf, frequency: 10170.0, gain: 3.79,  q: 0.71}
+        "400":
+          description: >-
+            Malformed or missing parameter. Codes `missing_parameter`,
+            `invalid_parameter`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                notANumber:
+                  value:
+                    status:
+                      ok: false
+                      error:
+                        code: invalid_parameter
+                        parameter: level
+                        message: "'level' must be a decimal number, for example 65 or 65.5."
+                      received: {level: "abc"}
+                      source:
+                        api_version: "1"
+                        iso_edition: "ISO 226:2023"
+                        generated_utc: "2026-08-04T22:57:32+00:00"
+                    filters: []
+        "422":
+          description: |
+            Well-formed but unsatisfiable. Codes:
+
+            - `out_of_range` — a parameter is outside its allowed bounds.
+            - `offset_unavailable` — `level - reference` is outside
+              `coverage.offset_range_db`.
+            - `correction_exceeds_budget` — the correction this level needs
+              exceeds the 12 dB a host PEQ can apply. Carries `suggestions`.
+            - `scale_unavailable` — partial compensation is not served in v1.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                tooQuiet:
+                  summary: Below the floor; note the actionable suggestions
+                  value:
+                    status:
+                      ok: false
+                      error:
+                        code: correction_exceeds_budget
+                        message: >-
+                          Cannot build a usable filter set for level=58,
+                          reference=83: the required headroom (-12.80 dB)
+                          exceeds the 12.0 dB available on Roon's Parametric EQ
+                          gain control.
+                        suggestions:
+                          - "level=62 — target a higher listening level."
+                          - "A lower 'reference' than 83, if this recording is mastered quieter."
+                      received: {level: "58"}
+                      source:
+                        api_version: "1"
+                        iso_edition: "ISO 226:2023"
+                        generated_utc: "2026-08-04T22:57:32+00:00"
+                    filters: []
+        "500":
+          description: Unhandled server error. Still JSON, code `internal_error`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/meta:
+    get:
+      operationId: getMeta
+      summary: What this service can serve.
+      description: >-
+        Call this before building a level control. `coverage.offset_range_db`
+        is the servable range of `level - reference`, already excluding
+        combinations the fitter refused.
+      responses:
+        "200":
+          description: Coverage description.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaResponse"
+              examples:
+                current:
+                  value:
+                    status:
+                      ok: true
+                      source:
+                        api_version: "1"
+                        iso_edition: "ISO 226:2023"
+                        generated_utc: "2026-08-04T22:57:32+00:00"
+                    coverage:
+                      offset_range_db: [-23, 7]
+                      offset_step_db: 1
+                      scales_available: [1.0]
+                      nominal_reference_db: 83.0
+                      equivalence_tolerance_db: 0.125
+                      band_count: 5
+                      design_fs: 44100.0
+                      preset_count: 35
+                    filters: []
+
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness probe.
+      responses:
+        "200":
+          description: Service is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: object
+                    properties:
+                      ok: {type: boolean}
+                      presets: {type: integer}
+                  filters:
+                    type: array
+                    maxItems: 0
+
+components:
+  schemas:
+
+    Filter:
+      type: object
+      description: >-
+        One RBJ Audio EQ Cookbook biquad. Apply in band order; the cascade is
+        equivalent under reordering but band order matches the published tables.
+      required: [band, type, frequency, gain, q]
+      properties:
+        band:
+          type: integer
+          description: 1-based position in the cascade.
+          examples: [1]
+        type:
+          type: string
+          description: >-
+            Filter topology. These exact strings are what host DSPs expect;
+            do not translate or normalise their case.
+          enum: [Low Shelf, Peak, High Shelf]
+        frequency:
+          type: number
+          description: Centre or corner frequency in Hz, to 4 significant figures.
+          examples: [66.7]
+        gain:
+          type: number
+          description: Gain in dB, to 2 decimals. Never exceeds ±12.
+          minimum: -12
+          maximum: 12
+          examples: [10.51]
+        q:
+          type: number
+          description: Q factor, to 2 decimals.
+          minimum: 0.25
+          maximum: 2.0
+          examples: [0.44]
+
+    Source:
+      type: object
+      required: [api_version, iso_edition, generated_utc]
+      properties:
+        api_version: {type: string, examples: ["1"]}
+        iso_edition:
+          type: string
+          description: Edition of the standard the presets were fitted against.
+          examples: ["ISO 226:2023"]
+        generated_utc:
+          type: string
+          format: date-time
+          description: >-
+            When the preset grid was fitted. Changes only when the filter maths
+            changes, so it is a safe cache key.
+
+    FilterResponse:
+      type: object
+      required: [status, filters]
+      properties:
+        status:
+          type: object
+          required: [ok, request, resolved, preset, source, notes]
+          properties:
+            ok:
+              type: boolean
+              const: true
+            request:
+              type: object
+              description: The parameters as interpreted, after defaults.
+              properties:
+                level: {type: number}
+                reference: {type: number}
+                scale: {type: number}
+            resolved:
+              type: object
+              description: The grid point actually served.
+              properties:
+                offset_db:
+                  type: integer
+                  description: level - reference, rounded to the 1 dB grid.
+                scale: {type: number}
+            preset:
+              type: object
+              required: [band_count, design_fs, headroom_db, max_residual_db, target_met]
+              properties:
+                band_count: {type: integer, examples: [5]}
+                design_fs:
+                  type: number
+                  description: Sample rate the filters were designed at, in Hz.
+                  examples: [44100.0]
+                headroom_db:
+                  type: number
+                  maximum: 0
+                  description: |
+                    **Mandatory.** Negative preamp the client must apply, in dB.
+                    Worst case across 44.1/48/96/192 kHz. Display it as
+                    prominently as the filters; omitting it causes clipping.
+                  examples: [-9.5]
+                max_residual_db:
+                  type: number
+                  description: >-
+                    Worst deviation of these published values from the ideal ISO
+                    226 target, in dB. Under 0.06 across most of the range;
+                    up to 0.21 at the quietest two levels, where the fit sits
+                    against the gain ceiling. All are far below audibility.
+                  examples: [0.0535]
+                target_met:
+                  type: boolean
+                  description: >-
+                    Whether the fit reached the 0.05 dB internal target. False
+                    for the quietest presets. Informational — a false value does
+                    not mean the preset is unusable.
+            source:
+              $ref: "#/components/schemas/Source"
+            notes:
+              type: array
+              description: >-
+                Human-readable remarks about how the request was interpreted —
+                grid snapping, or serving a non-default reference through the
+                offset equivalence. Not errors. Worth surfacing in a UI.
+              items: {type: string}
+        filters:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Filter"
+
+    ErrorResponse:
+      type: object
+      required: [status, filters]
+      properties:
+        status:
+          type: object
+          required: [ok, error, source]
+          properties:
+            ok:
+              type: boolean
+              const: false
+            error:
+              type: object
+              required: [code, message]
+              properties:
+                code:
+                  type: string
+                  enum:
+                    - missing_parameter
+                    - invalid_parameter
+                    - out_of_range
+                    - offset_unavailable
+                    - correction_exceeds_budget
+                    - scale_unavailable
+                    - preset_unavailable
+                    - not_found
+                    - method_not_allowed
+                    - internal_error
+                message:
+                  type: string
+                  description: Complete sentence, safe to show to a user.
+                parameter:
+                  type: string
+                  description: Which parameter was at fault, when one was.
+                suggestions:
+                  type: array
+                  description: >-
+                    Concrete alternatives already expressed in this API's terms
+                    and shifted onto the caller's reference. Following one
+                    succeeds. Render as clickable retries where possible.
+                  items: {type: string}
+            received:
+              type: object
+              description: >-
+                The recognised parameters exactly as sent, unparsed. Useful for
+                echoing back what the user typed.
+              additionalProperties: {type: string}
+            source:
+              $ref: "#/components/schemas/Source"
+        filters:
+          type: array
+          maxItems: 0
+
+    MetaResponse:
+      type: object
+      required: [status, coverage, filters]
+      properties:
+        status:
+          type: object
+          properties:
+            ok: {type: boolean, const: true}
+            source:
+              $ref: "#/components/schemas/Source"
+        coverage:
+          type: object
+          required: [offset_range_db, offset_step_db, scales_available]
+          properties:
+            offset_range_db:
+              type: array
+              description: >-
+                Inclusive [min, max] of level - reference that can be served.
+                Combinations the fitter refused are already excluded.
+              items: {type: integer}
+              minItems: 2
+              maxItems: 2
+              examples: [[-23, 7]]
+            offset_step_db:
+              type: integer
+              description: Grid spacing. Requests are snapped to it.
+              examples: [1]
+            scales_available:
+              type: array
+              items: {type: number}
+              examples: [[1.0]]
+            nominal_reference_db:
+              type: number
+              description: The reference the grid was actually fitted at.
+              examples: [83.0]
+            equivalence_tolerance_db:
+              type: number
+              description: >-
+                Worst-case error introduced by serving a different reference
+                through the offset equivalence, over references 72-85 dB.
+              examples: [0.125]
+            band_count: {type: integer, examples: [5]}
+            design_fs: {type: number, examples: [44100.0]}
+            preset_count: {type: integer, examples: [35]}
+        filters:
+          type: array
+          maxItems: 0

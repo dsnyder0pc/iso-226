@@ -59,6 +59,12 @@ OFFSET_MIN, OFFSET_MAX = DATA["offset_range_db"]
 AVAILABLE_SCALES = [round(s, 2) for s in DATA["scales"]]
 MAX_AVAILABLE_SCALE = max(AVAILABLE_SCALES)
 
+# The grid is fitted wider than it can serve: the deepest offsets are fitted,
+# refused by check_budget and stored as refusals. A client building a level
+# control needs the range that actually works, not the range that was attempted.
+_SERVABLE = sorted(e["offset"] for e in PRESETS.values() if not e["refused"])
+SERVABLE_MIN, SERVABLE_MAX = _SERVABLE[0], _SERVABLE[-1]
+
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
 
@@ -284,7 +290,8 @@ def meta():
     return jsonify({
         "status": {"ok": True, "source": _source_block()},
         "coverage": {
-            "offset_range_db": [OFFSET_MIN, OFFSET_MAX],
+            "offset_range_db": [SERVABLE_MIN, SERVABLE_MAX],
+            "offset_step_db": 1,
             "scales_available": AVAILABLE_SCALES,
             "nominal_reference_db": DATA["nominal_reference_db"],
             "equivalence_tolerance_db": DATA["equivalence_tolerance_db"],
