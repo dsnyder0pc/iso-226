@@ -572,10 +572,48 @@ def is_null_correction(result):
     return all(abs(f[2]) < HOST_GAIN_PRECISION_DB / 2 for f in result['filters'])
 
 
-def write_markdown_table(result, comp, headroom, filename):
-    """Write the two-tier PEQ table."""
+def _write_page(lines, filename):
+    """Write one Markdown page and echo it, as both branches below need to."""
+    content = "\n".join(lines)
+    with open(filename, 'w', encoding='utf-8') as handle:
+        handle.write(content)
+    print(content)
+    print(f"Saved PEQ table to: {filename}")
+
+
+def _image_block(comp, image, null):
+    """Markdown embedding the response plot beneath the table.
+
+    The tables are read as rendered pages as much as they are typed from, and
+    every host worth using draws a curve while the values go in. A listener
+    entering a band at a time can compare the shape on screen against this one
+    and catch a transposed digit before it reaches their speakers -- which the
+    numbers alone cannot do.
+    """
+    caption = (
+        "*The published values are flat by construction: there is nothing to "
+        "enter, and this is what your DSP should keep showing.*"
+        if null else
+        "*Published, rounded values (blue) against the ideal ISO 226 target "
+        "(grey), with the headroom adjustment applied. Most DSPs draw this "
+        "curve as you type — yours should end up the same shape.*")
+    return [
+        f"![Frequency response at {_level_str(comp.level)} dB]({image})",
+        "",
+        caption,
+        "",
+    ]
+
+
+def write_markdown_table(result, comp, headroom, filename, image=None):
+    """Write the PEQ table, optionally embedding its response plot.
+
+    ``image`` is written into the page as given, so the caller decides how the
+    two artifacts sit relative to each other: side by side for a CLI run,
+    ``../images/<stem>.png`` for the committed presets under ``PEQ/``.
+    """
     if is_null_correction(result):
-        content = "\n".join([
+        lines = [
             f"### No Compensation Needed at {_level_str(comp.level)} dB",
             "",
             f"*Mastering reference {comp.reference:g} dB"
@@ -593,11 +631,10 @@ def write_markdown_table(result, comp, headroom, filename):
             "Reaching for the nearest neighbouring preset instead would apply "
             "about 1.6 dB of correction you do not want.",
             "",
-        ])
-        with open(filename, 'w', encoding='utf-8') as handle:
-            handle.write(content)
-        print(content)
-        print(f"Saved PEQ table to: {filename}")
+        ]
+        if image:
+            lines += _image_block(comp, image, null=True)
+        _write_page(lines, filename)
         return
 
     lines = [
@@ -620,12 +657,9 @@ def write_markdown_table(result, comp, headroom, filename):
         "",
     ]
     lines += TABLE_HEAD + _filter_rows(result['filters']) + [""]
-
-    content = "\n".join(lines)
-    with open(filename, 'w', encoding='utf-8') as handle:
-        handle.write(content)
-    print(content)
-    print(f"Saved PEQ table to: {filename}")
+    if image:
+        lines += _image_block(comp, image, null=False)
+    _write_page(lines, filename)
 
 
 def write_camilladsp_yaml(result, comp, headroom, filename):
@@ -761,7 +795,7 @@ def main():
           f"opposing neighbours {diag['opposing_neighbours']:.2f} dB/octave")
 
     stem = preset_stem(comp)
-    write_markdown_table(result, comp, headroom, f"{stem}.md")
+    write_markdown_table(result, comp, headroom, f"{stem}.md", f"{stem}.png")
     write_camilladsp_yaml(result, comp, headroom, f"{stem}.yml")
     plot_frequency_response(result, comp, headroom, f"{stem}.png")
     return 0

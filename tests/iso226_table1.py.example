@@ -25,7 +25,8 @@ The loader checks that each column has 29 entries and that L_U at 1 kHz is
 exactly 0.0 -- which it is by definition, since L_U is specified relative to
 1 kHz. That catches an off-by-one during transcription, the likeliest mistake.
 
-If you do not hold a copy of the standard, the presets in `REW/` were generated
+If you do not hold a copy of the standard, the presets in `PEQ/` and `REW/`
+were generated
 with these coefficients and are usable as they are; only regenerating them or
 building new levels needs this file.
 """

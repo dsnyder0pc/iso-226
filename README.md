@@ -62,8 +62,8 @@ This project uses **option 2** and prints the exact attenuation to apply.
 
 ## Requirements
 
-**To use the filters: nothing.** The presets in [REW](REW) are plain text —
-type them into Roon, or load the YAML into REW or CamillaDSP. Skip to
+**To use the filters: nothing.** The presets are plain text — type the
+[tables](PEQ) into Roon, or load the [YAML](REW) into REW or CamillaDSP. Skip to
 [Importing into REW, Roon and other DSPs](#importing-into-rew-roon-and-other-dsps).
 
 **To run the generator yourself:** Python, plus your own copy of ISO 226:2023.
@@ -100,12 +100,12 @@ something you measure; `--reference` is something you know (or assume) about the
 record. Confusing the two is what makes very quiet listening look impossible
 when it isn't — see *Recordings mastered quietly* below.
 
-Three files are written per preset, named
-`filter_<reference>_to_<level>_s<scale>`: `.md` (the tables), `.yml`
-(CamillaDSP YAML for REW import) and `.png` (the response plot). So
-`--level 65` produces `filter_83_to_65_s1.0.md` and friends. Both levels appear in
-the name because a compensation curve is defined by the *pair*, not by the
-listening level alone.
+Three files are written per preset into the directory you run from, named
+`filter_<reference>_to_<level>_s<scale>`: `.md` (the table), `.yml`
+(CamillaDSP YAML for REW import) and `.png` (the response plot, which the table
+embeds). So `--level 65` produces `filter_83_to_65_s1.0.md` and friends. Both
+levels appear in the name because a compensation curve is defined by the
+*pair*, not by the listening level alone.
 
 ### Verify
 
@@ -284,29 +284,34 @@ levels.
 
 ### Pre-generated filters (no Python required)
 
-These need neither Python nor a copy of the standard. Ready-made CamillaDSP YAML
-files for an 83 dB mastering reference are in the [REW](REW) directory:
+These need neither Python nor a copy of the standard. Every preset for an 83 dB
+mastering reference ships in two forms: a **table** in [PEQ](PEQ) to read and
+type in by hand, and a **CamillaDSP YAML** file in [REW](REW) to load.
 
-| File | Listening level | Relative to reference |
+| Preset | Listening level | Relative to reference |
 | :--- | :--- | :--- |
-| [filter_83_to_60_s1.0](REW/filter_83_to_60_s1.0.yml) | 60 dB — the floor | −23 dB |
-| [filter_83_to_61_s1.0](REW/filter_83_to_61_s1.0.yml) | 61 dB | −22 dB |
-| [filter_83_to_62_s1.0](REW/filter_83_to_62_s1.0.yml) | 62 dB — very quiet | −21 dB |
-| [filter_83_to_65_s1.0](REW/filter_83_to_65_s1.0.yml) | 65 dB — quiet | −18 dB |
-| [filter_83_to_68_s1.0](REW/filter_83_to_68_s1.0.yml) | 68 dB | −15 dB |
-| [filter_83_to_71_s1.0](REW/filter_83_to_71_s1.0.yml) | 71 dB | −12 dB |
-| [filter_83_to_74_s1.0](REW/filter_83_to_74_s1.0.yml) | 74 dB | −9 dB |
-| [filter_83_to_75_s1.0](REW/filter_83_to_75_s1.0.yml) | 75 dB — moderate | −8 dB |
-| [filter_83_to_77_s1.0](REW/filter_83_to_77_s1.0.yml) | 77 dB | −6 dB |
-| [filter_83_to_80_s1.0](REW/filter_83_to_80_s1.0.yml) | 80 dB | −3 dB |
-| [filter_83_to_83_s1.0](REW/filter_83_to_83_s1.0.md) | 83 dB — at reference | 0 dB *(no correction)* |
-| [filter_83_to_85_s1.0](REW/filter_83_to_85_s1.0.yml) | 85 dB — loud | +2 dB |
-| [filter_83_to_86_s1.0](REW/filter_83_to_86_s1.0.yml) | 86 dB | +3 dB |
-| [filter_83_to_89_s1.0](REW/filter_83_to_89_s1.0.yml) | 89 dB | +6 dB |
+| [table](PEQ/filter_83_to_60_s1.0.md) · [yaml](REW/filter_83_to_60_s1.0.yml) | 60 dB — the floor | −23 dB |
+| [table](PEQ/filter_83_to_61_s1.0.md) · [yaml](REW/filter_83_to_61_s1.0.yml) | 61 dB | −22 dB |
+| [table](PEQ/filter_83_to_62_s1.0.md) · [yaml](REW/filter_83_to_62_s1.0.yml) | 62 dB — very quiet | −21 dB |
+| [table](PEQ/filter_83_to_65_s1.0.md) · [yaml](REW/filter_83_to_65_s1.0.yml) | 65 dB — quiet | −18 dB |
+| [table](PEQ/filter_83_to_68_s1.0.md) · [yaml](REW/filter_83_to_68_s1.0.yml) | 68 dB | −15 dB |
+| [table](PEQ/filter_83_to_71_s1.0.md) · [yaml](REW/filter_83_to_71_s1.0.yml) | 71 dB | −12 dB |
+| [table](PEQ/filter_83_to_74_s1.0.md) · [yaml](REW/filter_83_to_74_s1.0.yml) | 74 dB | −9 dB |
+| [table](PEQ/filter_83_to_75_s1.0.md) · [yaml](REW/filter_83_to_75_s1.0.yml) | 75 dB — moderate | −8 dB |
+| [table](PEQ/filter_83_to_77_s1.0.md) · [yaml](REW/filter_83_to_77_s1.0.yml) | 77 dB | −6 dB |
+| [table](PEQ/filter_83_to_80_s1.0.md) · [yaml](REW/filter_83_to_80_s1.0.yml) | 80 dB | −3 dB |
+| [table](PEQ/filter_83_to_83_s1.0.md) · [yaml](REW/filter_83_to_83_s1.0.yml) | 83 dB — at reference | 0 dB *(no correction)* |
+| [table](PEQ/filter_83_to_85_s1.0.md) · [yaml](REW/filter_83_to_85_s1.0.yml) | 85 dB — loud | +2 dB |
+| [table](PEQ/filter_83_to_86_s1.0.md) · [yaml](REW/filter_83_to_86_s1.0.yml) | 86 dB | +3 dB |
+| [table](PEQ/filter_83_to_89_s1.0.md) · [yaml](REW/filter_83_to_89_s1.0.yml) | 89 dB | +6 dB |
 
-Each comes in two forms: **`.yml`** for loading straight into REW, and **`.md`**
-with the filter tables for typing by hand into Roon, Equalizer APO or a hardware
-DSP. The ladder runs in 3 dB steps, so a listener whose measured level falls
+The **`.md`** tables render as a page in the GitHub and GitLab file browsers:
+five rows to type into Roon, Equalizer APO or a hardware DSP, the headroom
+figure to enter alongside them, and the response plot underneath so you can
+check the curve your DSP draws against the one it should be. The **`.yml`**
+files load straight into REW or CamillaDSP and need no typing at all.
+
+The ladder runs in 3 dB steps, so a listener whose measured level falls
 between two rungs loses at most about 0.8 dB by snapping to the nearer one —
 comfortably inside the uncertainty of their own SPL measurement. The 75 and
 85 dB entries are not on the 3 dB grid; they are there because the worked
@@ -783,8 +788,8 @@ compensation have little hearing left above 12.5 kHz.
 The software is MIT licensed — see [LICENSE](LICENSE).
 
 That licence covers this project's own code, including the generated presets in
-[REW](REW) — those are this project's own fitted filter values, not ISO's, and
-you can use them freely.
+[PEQ](PEQ) and [REW](REW) — those are this project's own fitted filter values,
+not ISO's, and you can use them freely.
 
 It does not cover anything from ISO 226:2023, and **nothing from the standard is
 reproduced here.** ISO confirmed on 1 August 2026 that reproducing Table 1

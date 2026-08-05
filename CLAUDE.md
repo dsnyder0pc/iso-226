@@ -19,15 +19,16 @@ pip install -r requirements.txt
 # Required before anything runs — see "ISO data" below
 cp tests/iso226_table1.py.example reference/iso226_table1.py   # then populate it
 
-# Generate filter_<ref>_to_<level>_s<scale>.{md,yml,png}
+# Generate filter_<ref>_to_<level>_s<scale>.{md,yml,png} in the working
+# directory. The generator writes nowhere else -- see "Output layout" below.
 python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 
 # Verify published values against the ideal target; writes a dual-trace error plot
 python check.py --level <db> [--reference <db>] [--scale <s>]
 
 # Regression tests — run after touching any math
-python -m pytest tests/                  # all 78 (~30 s)
-python -m pytest tests/ -m "not slow"    # 67 fast ones (~1 s)
+python -m pytest tests/                  # all 124 (~30 s)
+python -m pytest tests/ -m "not slow"    # 113 fast ones (~1 s)
 
 # Rebuild every committed preset and figure (several minutes)
 python regenerate.py
@@ -39,7 +40,8 @@ shellcheck -S style path/to/script.sh    # any Bash added to the repo
 ```
 
 `regenerate.py` is the single source of truth for which presets ship — the
-`LADDER`, `EXTRA` and `FEATURED` lists in that file, not the contents of `REW/`.
+`LADDER`, `EXTRA` and `FEATURED` lists in that file, not the contents of `PEQ/`
+or `REW/`.
 Run it after any change to the math, the optimizer or the coefficients, then
 reconcile the README, which quotes headroom values, residual errors and filter
 tables.
@@ -138,7 +140,8 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     needs to fit something, the answer is to widen the grid, not to import the
     generator.
   - **There are now two generated artifacts, and nothing keeps them in step
-    automatically.** `regenerate.py` writes `REW/`; `precompute_presets.py`
+    automatically.** `regenerate.py` writes `PEQ/`, `REW/` and `images/`;
+    `precompute_presets.py`
     writes `web/presets.json`. Change the math and you must run **both**, or the
     website will serve different filters from the ones the repository publishes.
     `test_api_grid_matches_the_committed_presets` fails when they diverge — that
@@ -258,11 +261,33 @@ lives in `regenerate.py` — so this applies to anything new.)
   built by `preset_stem()` in `loudness-filters.py` and imported by `check.py`.
   Both levels are in the name because the curve is defined by the pair; scale is
   in the name so taste variants coexist.
-- **`REW/` holds committed presets** for 60–90 dB @ 83 dB reference. **60 dB is
-  the floor**, not 62: at 59 dB the fitted cascade needs 12.35 dB and
-  `check_budget` refuses it. `.gitignore` anchors `/filter_*` to the repo root,
-  so root-level output is scratch while `REW/*.yml` and `images/*.png` stay
-  tracked.
+- **Output layout is the wrapper's business, never the generator's.**
+  `loudness-filters.py` and `check.py` write to the paths they are handed, and
+  their CLIs hand themselves bare filenames — output lands in the working
+  directory, three files side by side. They must not learn that `PEQ/`, `REW/`
+  or `images/` exist, must not create directories, and must not emit a path
+  that assumes one. `regenerate.py` is the wrapper that knows the layout and
+  files each artifact where the repository wants it. This is a standing
+  instruction from the owner, not an accident of history.
+- **`PEQ/` holds the committed tables, `REW/` the CamillaDSP YAML**, for
+  60–90 dB @ 83 dB reference — the same ladder in two formats, which
+  `test_every_committed_table_has_its_yaml` enforces. The split exists because
+  the two are read differently: a `.md` renders as a page in the GitLab/GitHub
+  file browser and gets typed in by hand, a `.yml` is loaded and never read.
+  **60 dB is the floor**, not 62: at 59 dB the fitted cascade needs 12.35 dB
+  and `check_budget` refuses it. `.gitignore` anchors `/filter_*` to the repo
+  root, so root-level output is scratch while `PEQ/*.md`, `REW/*.yml` and
+  `images/*.png` stay tracked.
+- **Every committed table embeds its response plot** as
+  `![...](../images/<stem>.png)`, written by `write_markdown_table`'s `image`
+  argument — the link text comes from the caller, so the relative hop out of
+  `PEQ/` is `regenerate.py`'s knowledge and not the generator's. The plot is a
+  confirmation aid: hosts draw a curve while filters are entered, and a
+  listener can compare shapes. Two consequences: every preset now needs a
+  response plot in `images/`, not just `FEATURED` (which now selects only the
+  extra *error* plots the README quotes), and the image line sits in the file
+  `check.py` parses — it is not a table row, and
+  `test_embedded_plot_does_not_disturb_the_table` keeps it that way.
 - **The floor and the suggested `--level` disagree by 2 dB, deliberately.**
   `suggest_alternatives` estimates from the peak of the *target* rather than
   from a fit it has not run, so it says 62 where 60 in fact fits. Do not

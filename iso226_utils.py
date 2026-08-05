@@ -50,7 +50,7 @@ ISO and cannot be redistributed, so this repository does not carry them.
   2. Fill in the three columns of Table 1 from your own copy of the standard
      (https://www.iso.org/standard/83117.html)
 
-The presets already in REW/ were generated with these coefficients and remain
+The presets already in PEQ/ and REW/ were generated with these coefficients and remain
 usable without this file; only regenerating them or building new listening
 levels needs it."""
 

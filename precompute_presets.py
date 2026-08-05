@@ -75,7 +75,7 @@ def _fit(job):
         headroom = round(-peak_gain(result['filters']) - 0.049, 1)
     # At the mastering reference the correction is nothing, and the fit says so
     # by returning every band at 0.00 dB. Publish that as no filters at all,
-    # the way REW/filter_83_to_83_s1.0.md does: five pass-through biquads are
+    # the way PEQ/filter_83_to_83_s1.0.md does: five pass-through biquads are
     # something a user would otherwise be asked to type in for no effect.
     if all(gain == 0.0 for _, _, gain, _ in result['filters']):
         return key, {"offset": offset, "scale": scale, "refused": False,

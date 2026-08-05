@@ -4,7 +4,7 @@ Regenerate every committed preset and figure.
 
 Run this after any change to the filter math, the optimizer or the ISO
 coefficients. It is the single source of truth for which presets ship: the
-ladder below is the definition, not the contents of REW/.
+ladder below is the definition, not the contents of PEQ/ or REW/.
 
     python regenerate.py            # regenerate everything (several minutes)
     python regenerate.py --list     # show what would be generated, and exit
@@ -73,10 +73,13 @@ LADDER = [60, 61, 62, 65, 68, 71, 74, 77, 80, 83, 86, 89]
 # undownloadable.
 EXTRA = [75, 85]
 
-# These additionally get a response plot and an error plot in images/.
+# These additionally get an error plot in images/, because the README quotes
+# them as worked examples. Every preset gets a response plot regardless: the
+# PEQ/ pages embed it.
 FEATURED = [65, 75, 85]
 
-REW_DIR = os.path.join(HERE, "REW")
+PEQ_DIR = os.path.join(HERE, "PEQ")      # the tables, read as rendered pages
+REW_DIR = os.path.join(HERE, "REW")      # CamillaDSP YAML, loaded not read
 IMAGES_DIR = os.path.join(HERE, "images")
 
 
@@ -93,8 +96,8 @@ def _quiet(func, *args, **kwargs):
         return func(*args, **kwargs)
 
 
-def generate(level, with_figures):
-    """Build one preset, install it in REW/, and optionally plot it."""
+def generate(level, with_error_plot):
+    """Build one preset: table in PEQ/, YAML in REW/, response plot in images/."""
     comp = Compensation(float(level), REFERENCE, SCALE)
     stem = lf.preset_stem(comp)
     started = time.perf_counter()
@@ -103,14 +106,17 @@ def generate(level, with_figures):
     lf.check_budget(result, comp)
     headroom = lf.headroom_adjustment(result)
 
+    # The table and its plot live in different directories, so the page links
+    # across. Relative, because GitLab and GitHub both render it from the blob
+    # view and a repo-absolute path would only work on one of them.
     _quiet(lf.write_markdown_table, result, comp, headroom,
-           os.path.join(REW_DIR, f"{stem}.md"))
+           os.path.join(PEQ_DIR, f"{stem}.md"), f"../images/{stem}.png")
     _quiet(lf.write_camilladsp_yaml, result, comp, headroom,
            os.path.join(REW_DIR, f"{stem}.yml"))
+    _quiet(lf.plot_frequency_response, result, comp, headroom,
+           os.path.join(IMAGES_DIR, f"{stem}.png"))
 
-    if with_figures:
-        _quiet(lf.plot_frequency_response, result, comp, headroom,
-               os.path.join(IMAGES_DIR, f"{stem}.png"))
+    if with_error_plot:
         _quiet(checker.plot_residual_error,
                get_filter_response(result["filters"], ISO_FREQ)
                - ideal_delta(comp),
@@ -138,16 +144,18 @@ def main():
             if level in EXTRA:
                 marks.append("extra")
             if level in FEATURED:
-                marks.append("figures")
+                marks.append("error plot")
             print(f"  {level:3d} dB  ({level - REFERENCE:+3.0f} dB relative)"
                   f"  {', '.join(marks)}")
-        print(f"\n{len(levels)} presets -> {2 * len(levels)} files in REW/, "
-              f"{2 * len(FEATURED)} in images/")
+        print(f"\n{len(levels)} presets -> {len(levels)} tables in PEQ/, "
+              f"{len(levels)} configs in REW/, "
+              f"{len(levels) + len(FEATURED)} figures in images/")
         return 0
 
-    os.makedirs(REW_DIR, exist_ok=True)
-    os.makedirs(IMAGES_DIR, exist_ok=True)
-    for directory, suffixes in ((REW_DIR, (".yml", ".md")),
+    for directory in (PEQ_DIR, REW_DIR, IMAGES_DIR):
+        os.makedirs(directory, exist_ok=True)
+    for directory, suffixes in ((PEQ_DIR, (".md",)),
+                                (REW_DIR, (".yml",)),
                                 (IMAGES_DIR, (".png",))):
         for name in os.listdir(directory):
             if name.startswith("filter_") and name.endswith(suffixes):
@@ -177,8 +185,9 @@ def main():
               "below audibility.")
 
     print(f"\nDone in {total / 60:.1f} minutes.")
-    print(f"  REW/    {2 * len(levels)} files")
-    print(f"  images/ {2 * len(FEATURED)} files")
+    print(f"  PEQ/    {len(levels)} tables")
+    print(f"  REW/    {len(levels)} configs")
+    print(f"  images/ {len(levels) + len(FEATURED)} figures")
     print("\nThe README quotes headroom values, residual errors and filter "
           "tables.\nCheck them against the output above before committing.")
     return 0

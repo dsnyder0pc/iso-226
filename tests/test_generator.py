@@ -89,6 +89,29 @@ def test_frequency_survives_rendering_without_exponent_or_trailing_zero(lf,
         38.67, 262.6, 900.0, 2910.0, 12000.0]
 
 
+def test_embedded_plot_does_not_disturb_the_table(lf, tmp_path):
+    """The image line sits in the same file check.py parses.
+
+    It is not a table row and must not be read as one -- nor may the caption
+    around it, which mentions the values the parser is looking for.
+    """
+    path = tmp_path / "filter_83_to_65_s1.0.md"
+    lf.write_markdown_table(SYNTHETIC, Compensation(65.0), -9.5, str(path),
+                            "../images/filter_83_to_65_s1.0.png")
+    text = path.read_text()
+    assert "![" in text and "../images/filter_83_to_65_s1.0.png" in text
+    assert parse_markdown_filters(str(path)) == [
+        (f[0], f[1], f[2], f[3]) for f in SYNTHETIC['filters']]
+    assert parse_markdown_metadata(str(path)) == (83.0, 1.0)
+
+
+def test_no_plot_is_embedded_unless_one_is_named(lf, tmp_path):
+    """A page written without an image must not link one that is not there."""
+    path = tmp_path / "filter_83_to_65_s1.0.md"
+    lf.write_markdown_table(SYNTHETIC, Compensation(65.0), -9.5, str(path))
+    assert "![" not in path.read_text()
+
+
 @pytest.mark.parametrize("ref,scale", [(83.0, 1.0), (72.0, 1.0), (83.0, 0.65)])
 def test_metadata_round_trips(lf, tmp_path, ref, scale):
     """check.py regenerates when these disagree, so they must survive writing."""
@@ -319,17 +342,19 @@ def test_published_headroom_prevents_clipping_at_every_rate(lf, preset):
 
 # --- The shipped ladder -----------------------------------------------------
 # Everything above tests the generator. These test what is actually committed
-# in REW/, which is what users download and what the README makes claims
-# about. They are fast: parsing and a frequency response, no fitting. Nothing
-# else notices when a shipped preset drifts out of budget, or when the README
-# and the files disagree about where the floor is.
+# in PEQ/ and REW/, which is what users download and what the README makes
+# claims about. They are fast: parsing and a frequency response, no fitting.
+# Nothing else notices when a shipped preset drifts out of budget, or when the
+# README and the files disagree about where the floor is.
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def _committed_presets():
-    """Every preset markdown file in REW/, as (stem, path) pairs."""
-    rew = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                       "REW")
-    return sorted((os.path.splitext(name)[0], os.path.join(rew, name))
-                  for name in os.listdir(rew) if name.endswith(".md"))
+    """Every preset markdown file in PEQ/, as (stem, path) pairs."""
+    peq = os.path.join(ROOT, "PEQ")
+    return sorted((os.path.splitext(name)[0], os.path.join(peq, name))
+                  for name in os.listdir(peq) if name.endswith(".md"))
 
 
 @pytest.mark.parametrize("stem,path", _committed_presets())
@@ -376,16 +401,46 @@ def test_committed_preset_publishes_its_own_headroom(stem, path):
         f"{stem} publishes {published} dB, more than 0.1 dB of slack")
 
 
+@pytest.mark.parametrize("stem,path", _committed_presets())
+def test_committed_preset_embeds_a_plot_that_exists(stem, path):
+    """The page and its figure are written by one command into two directories.
+
+    A rendered table with a broken image is worse than one with no image: it
+    tells a listener entering filters by hand that something is missing without
+    saying what. The link is relative and crosses out of PEQ/, so resolve it
+    the way a renderer would rather than assuming the layout.
+    """
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    match = re.search(r"!\[[^\]]*\]\(([^)]+)\)", text)
+    assert match, f"{stem} embeds no response plot"
+    target = os.path.normpath(os.path.join(os.path.dirname(path), match.group(1)))
+    assert os.path.exists(target), (
+        f"{stem} links {match.group(1)}, which does not exist. "
+        f"Rerun regenerate.py.")
+    assert os.path.basename(target) == f"{stem}.png", (
+        f"{stem} embeds {os.path.basename(target)} -- another preset's plot")
+
+
+def test_every_committed_table_has_its_yaml():
+    """The two directories hold the same ladder in two formats."""
+    tables = {stem for stem, _ in _committed_presets()}
+    configs = {os.path.splitext(name)[0]
+               for name in os.listdir(os.path.join(ROOT, "REW"))
+               if name.endswith(".yml")}
+    assert tables == configs, (
+        f"PEQ/ and REW/ ship different presets: {tables ^ configs}")
+
+
 def test_api_grid_matches_the_committed_presets():
-    """web/presets.json and REW/ must publish the same filters.
+    """web/presets.json and the committed tables must publish the same filters.
 
     They are produced by different commands -- regenerate.py and
     precompute_presets.py -- so a maths change that reruns one and not the
     other would leave the website serving filters the repository does not
     publish. Nothing else notices.
     """
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    with open(os.path.join(root, "web", "presets.json"), encoding="utf-8") as fh:
+    with open(os.path.join(ROOT, "web", "presets.json"), encoding="utf-8") as fh:
         grid = json.load(fh)["presets"]
 
     checked = 0
@@ -393,12 +448,12 @@ def test_api_grid_matches_the_committed_presets():
         level = int(stem.split("_to_")[1].split("_")[0])
         entry = grid.get(f"{level - 83:+d}|1.00")
         assert entry is not None and not entry["refused"], (
-            f"{stem} ships in REW/ but the API grid cannot serve it")
+            f"{stem} ships in PEQ/ but the API grid cannot serve it")
         published = [tuple(row) for row in parse_markdown_filters(path)]
         served = [(f["type"], f["frequency"], f["gain"], f["q"])
                   for f in entry["filters"]]
         assert published == served, (
-            f"{stem}: REW/ and web/presets.json disagree. "
+            f"{stem}: PEQ/ and web/presets.json disagree. "
             f"Rerun both regenerate.py and precompute_presets.py.")
         checked += 1
     assert checked >= 10, "expected the whole committed ladder to be compared"

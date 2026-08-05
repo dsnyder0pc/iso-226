@@ -1,9 +1,10 @@
 # Developing on this project
 
 Everything here is for people cloning or forking the repository. If you only
-want to *use* the filters, you need none of it — the presets in
-[REW](REW) are ready to type in or load, and [README.md](README.md) explains
-how. Nothing below is required to listen to music.
+want to *use* the filters, you need none of it — the tables in [PEQ](PEQ) are
+ready to type in and the YAML in [REW](REW) is ready to load, and
+[README.md](README.md) explains how. Nothing below is required to listen to
+music.
 
 ---
 
@@ -76,7 +77,8 @@ ISO's own copy, and provenance is the entire point. See [NOTICE](NOTICE).
 ## Running things
 
 ```bash
-# Generate filter_<ref>_to_<level>_s<scale>.{md,yml,png}
+# Generate filter_<ref>_to_<level>_s<scale>.{md,yml,png} in the working
+# directory — the generator never writes into a project subdirectory
 python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 
 # Check published values against the ideal target; writes an error plot
@@ -88,10 +90,18 @@ python regenerate.py --list          # what would be built, without building it
 ```
 
 `regenerate.py` is the single source of truth for which presets ship — the
-`LADDER`, `EXTRA` and `FEATURED` lists in that file, not the contents of `REW/`.
+`LADDER`, `EXTRA` and `FEATURED` lists in that file, not the contents of
+`PEQ/` or `REW/`.
 Run it after any change to the math, the optimizer or the coefficients, then
 reconcile the README, which quotes headroom values, residual errors and filter
 tables.
+
+It is also the only thing that knows the repository layout: the generator
+writes to the working directory, and `regenerate.py` places each preset's
+table in `PEQ/`, its CamillaDSP config in `REW/` and its plots in `images/`,
+and links the table to its plot. Do not teach the generator about those
+directories — a wrapper that arranges output is easier to keep honest than a
+tool that assumes where it is being run.
 
 A single generator run takes 20–45 seconds. It is data-dependent: the search
 stops when it reaches its target, when it stops improving, or at a restart cap,
@@ -102,8 +112,8 @@ so a hard level like 62 dB costs about twice an easy one.
 ## Tests
 
 ```bash
-python -m pytest tests/                  # all 78 (~30 s)
-python -m pytest tests/ -m "not slow"    # 67 fast ones (~1 s)
+python -m pytest tests/                  # all 124 (~30 s)
+python -m pytest tests/ -m "not slow"    # 113 fast ones (~1 s)
 ```
 
 The `slow` ones generate a real preset and assert what actually ships: that no
