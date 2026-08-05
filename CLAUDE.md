@@ -27,15 +27,16 @@ python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 python check.py --level <db> [--reference <db>] [--scale <s>]
 
 # Regression tests — run after touching any math
-python -m pytest tests/                  # all 125 (~30 s)
-python -m pytest tests/ -m "not slow"    # 114 fast ones (~1 s)
+python -m pytest tests/                  # all 167 (~30 s)
+python -m pytest tests/ -m "not slow"    # 156 fast ones (~1 s)
 
 # Rebuild every committed preset and figure (several minutes)
 python regenerate.py
 python regenerate.py --list              # what would be generated, without doing it
 
 # Linters — both must be clean before committing
-python -m pylint check.py loudness-filters.py iso226_utils.py regenerate.py tests/
+python -m pylint check.py loudness-filters.py iso226_utils.py \
+    regenerate.py precompute_presets.py web/app.py tests/
 shellcheck -S style path/to/script.sh    # any Bash added to the repo
 ```
 
@@ -149,7 +150,41 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     API.
   - `web/openapi.yaml` is the contract handed to front-end authors and code
     generators. Its examples are copied from live responses and asserted against
-    them, so it cannot drift silently either.
+    them by `test_documented_examples_match_live_responses`, which rebuilds each
+    example's request from the example itself, so it cannot drift silently
+    either. (That assertion was described here long before it existed. It exists
+    now; do not let it lapse.)
+  - **The grid is fitted wider than it can serve.** The deepest offsets are
+    fitted, refused by `check_budget` and stored as refusals, so `OFFSET_MIN/MAX`
+    (fitted) and `SERVABLE_MIN/MAX` (usable) are different numbers and mean
+    different things. Test against the fitted range — an offset inside it has a
+    stored entry whose refusal names the budget it exceeded, which is far more
+    use than a range error — but **advertise the servable range**, because that
+    is what `/v1/meta` and the spec promise. Quoting the fitted range in a
+    message sent callers to levels that were fitted, refused and unavailable;
+    `test_every_suggested_level_can_actually_be_served` now holds the API to the
+    same rule the CLI's `suggest_alternatives` follows.
+
+- **`tests/test_api.py`** — the HTTP service, through Flask's test client: no
+  server, no port, no gunicorn, 0.3 s for the file. Flask is deliberately absent
+  from the repository's `requirements.txt` (only `web/requirements.txt` has it),
+  so the `api` fixture in `conftest.py` uses `importorskip` — a contributor
+  working on the maths must not have to install a web framework. The two
+  contracts worth the most are the uniform two-key response shape and that every
+  level the API suggests can actually be served.
+  - Live responses are also validated against the schemas in `openapi.yaml`.
+    OpenAPI 3.1 schemas **are** JSON Schema 2020-12, so they are used directly
+    rather than translated. The spec is registered with `referencing` under
+    `SPEC_URI` and each response schema is reached by JSON pointer into that
+    document — not lifted out as a value, because a bare `{"$ref": "#/..."}`
+    resolves against itself and finds nothing, and because refs *inside* a
+    lifted schema would lose the document they were written in.
+    `test_the_schemas_are_strict_enough_to_reject_a_broken_response` breaks a
+    real response two ways and requires the schema to notice; without it a
+    permissive schema would make the whole group pass vacuously.
+  - `jsonschema>=4.18` is in the root `requirements.txt` as a **test**
+    dependency (4.18 is where the `referencing` registry arrived). It must
+    never reach `web/requirements.txt`.
 
 - **`tests/test_iso226.py`** — the math. `test_matches_published_annex_b` and
   the shelf-property tests are the ones that matter: they are the only checks

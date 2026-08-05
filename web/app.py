@@ -239,15 +239,23 @@ def filters():
             "so there is nothing to correct. Apply no filters and no headroom "
             "adjustment, and disable any preset left over from another level.")
 
+    # Two different bounds, deliberately. The *test* is the fitted range,
+    # because an offset inside it has a stored entry whose refusal names the
+    # budget it exceeded -- far more use than a range error. The *message* is
+    # the servable range, the one /v1/meta and the spec advertise: quoting the
+    # fitted range here would send a caller to a level that is fitted, refused
+    # and still unavailable. Every level this API suggests must be one it can
+    # actually serve, which is the rule the CLI's suggest_alternatives follows.
     if not OFFSET_MIN <= offset <= OFFSET_MAX:
         return _error(
             "offset_unavailable",
             f"level - reference is {offset:+d} dB, outside the "
-            f"{OFFSET_MIN:+d}..{OFFSET_MAX:+d} dB range this service covers.",
+            f"{SERVABLE_MIN:+d}..{SERVABLE_MAX:+d} dB range this service "
+            f"covers.",
             422,
             suggestions=[f"Choose a level between "
-                         f"{reference + OFFSET_MIN:g} and "
-                         f"{reference + OFFSET_MAX:g} dB for this reference."])
+                         f"{reference + SERVABLE_MIN:g} and "
+                         f"{reference + SERVABLE_MAX:g} dB for this reference."])
 
     # Partial compensation is a v2 feature: the grid ships full compensation
     # only. Reject rather than silently serve a curve the caller did not ask

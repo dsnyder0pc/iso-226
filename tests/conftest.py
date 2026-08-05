@@ -64,6 +64,24 @@ def lf():
     return module
 
 
+@pytest.fixture(scope="session")
+def api():
+    """The web service module, loaded from web/ without installing anything.
+
+    Flask is not in the repository's requirements: the generator does not need
+    it, and the service deliberately does not need the generator's NumPy or
+    SciPy. Skip rather than fail when it is absent, the way the Annex B fixture
+    does -- a contributor working on the maths should not have to install a web
+    framework to run the suite.
+    """
+    pytest.importorskip("flask", reason="web/requirements.txt not installed")
+    spec = importlib.util.spec_from_file_location(
+        "iso226_api", os.path.join(REPO_ROOT, "web", "app.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 # Requesting one fixture from another necessarily shadows its name; that is the
 # pytest idiom, not an accident.
 # pylint: disable=redefined-outer-name
@@ -75,3 +93,10 @@ def preset(lf):
     properties of a single run rather than paying that cost repeatedly.
     """
     return lf.calculate_filters(Compensation(65.0, 83.0))
+
+
+@pytest.fixture()
+def client(api):
+    """A Flask test client. No server, no port, no gunicorn."""
+    api.app.config.update(TESTING=True)
+    return api.app.test_client()

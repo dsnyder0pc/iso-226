@@ -112,8 +112,8 @@ so a hard level like 62 dB costs about twice an easy one.
 ## Tests
 
 ```bash
-python -m pytest tests/                  # all 125 (~30 s)
-python -m pytest tests/ -m "not slow"    # 114 fast ones (~1 s)
+python -m pytest tests/                  # all 167 (~30 s)
+python -m pytest tests/ -m "not slow"    # 156 fast ones (~1 s)
 ```
 
 The `slow` ones generate a real preset and assert what actually ships: that no
@@ -126,6 +126,25 @@ keeps the response at or below 0 dBFS at every verified sample rate.
 They share one session-scoped `preset` fixture that runs the optimizer once. Add
 new integration assertions to that fixture rather than generating another
 preset.
+
+### The API tests
+
+`tests/test_api.py` drives `web/app.py` through Flask's test client — no
+server, no port, no gunicorn. Flask is not in the requirements above, because
+neither the generator nor the maths needs a web framework, so those tests skip
+unless you also install the service's own dependencies:
+
+```bash
+pip install -r web/requirements.txt      # flask, gunicorn
+```
+
+They check two things nothing else does: that every response — success, client
+error, server error — carries the same top-level shape, and that every
+listening level the API suggests is one it can actually serve. They also
+validate live responses against the schemas declared in `web/openapi.yaml`
+(OpenAPI 3.1 schemas are JSON Schema 2020-12, so they are used directly), and
+assert the spec's examples against real responses, so the contract cannot drift
+from the implementation in silence.
 
 ### Why the suite anchors on things the project does not compute
 
@@ -160,7 +179,8 @@ broken function that had built them.
 **pylint must reach 10.00/10.**
 
 ```bash
-python -m pylint check.py loudness-filters.py iso226_utils.py regenerate.py tests/
+python -m pylint check.py loudness-filters.py iso226_utils.py \
+    regenerate.py precompute_presets.py web/app.py tests/
 ```
 
 Run it exactly like that. Linting `tests/` on its own reports spurious
