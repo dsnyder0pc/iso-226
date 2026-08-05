@@ -525,25 +525,28 @@ left implicit.
 
 #### On reproducing ISO's data
 
-Two pieces of ISO 226:2023 appear in this repository, and they are treated
-differently on purpose.
+Two pieces of ISO 226:2023 are needed to run and to check this project, and
+**neither of them is in this repository.** Both are loaded at runtime from
+files under `reference/` that are gitignored and that you supply from your own
+copy of the standard; [CONTRIBUTING.md](CONTRIBUTING.md) has the mechanics.
+What differs between them is the consequence of not having one.
 
-**Table 1** — the 29 rows of $\alpha_f$, $L_U$ and $T_f$ — is reproduced in
-`iso226_utils.py`. It has to be: those 87 numbers *are* the standard's model of
-hearing, and without them there is no working implementation to publish. They
-are measured and fitted parameters rather than creative expression, and the
-equivalent table from the 2003 edition has been reproduced openly in numerous
-public implementations for two decades. They are reproduced here in that spirit,
-with attribution, and this project is not a substitute for the standard: anyone
-doing serious work with equal-loudness contours should buy it.
+**Table 1** — the 29 rows of $\alpha_f$, $L_U$ and $T_f$ — is the standard's
+model of hearing, and Formula (1) cannot be evaluated without it. Nothing here
+reconstructs, approximates or works around those 87 numbers, so without that
+file there is no import, no test run and no generated preset. That is the
+intended behaviour rather than a gap to route around: ISO customer service
+confirmed on 1 August 2026 that reproducing Table 1 requires explicit
+permission rather than being covered automatically by fair use, and that such
+permissions are handled by the national member body — ANSI in the United
+States. A request is with ANSI, and pending an answer the coefficients were
+removed rather than shipped on an assumption. If permission is granted they may
+be restored. See [License and third-party
+content](#license-and-third-party-content) below, and [NOTICE](NOTICE).
 
-**Annex B** is not reproduced. It is the one piece that is genuinely
-paywall-exclusive, it is not needed to *run* anything, and it is used only to
-check the implementation — so it is supplied locally by whoever owns a copy.
-
-Permission for the Table 1 reproduction has been requested and is pending — see
-[License and third-party content](#license-and-third-party-content) below, and
-[NOTICE](NOTICE).
+**Annex B** is not needed to *run* anything — it is used only to check the
+implementation against the standard's own published contours — so its absence
+costs one skipped test rather than the whole project.
 
 Note that ISO's own free preview does **not** include Table 1; it covers the
 Foreword, Introduction, Scope, normative references and terms only. The
