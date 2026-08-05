@@ -112,8 +112,8 @@ so a hard level like 62 dB costs about twice an easy one.
 ## Tests
 
 ```bash
-python -m pytest tests/                  # all 124 (~30 s)
-python -m pytest tests/ -m "not slow"    # 113 fast ones (~1 s)
+python -m pytest tests/                  # all 125 (~30 s)
+python -m pytest tests/ -m "not slow"    # 114 fast ones (~1 s)
 ```
 
 The `slow` ones generate a real preset and assert what actually ships: that no

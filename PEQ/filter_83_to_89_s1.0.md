@@ -16,6 +16,8 @@ A complete full-spectrum correction. The residual error is the deviation these p
 | 4 | Peak | 3422 | 0.27 | 0.25 |
 | 5 | High Shelf | 10160 | -1.26 | 0.72 |
 
+---
+
 ![Frequency response at 89 dB](../images/filter_83_to_89_s1.0.png)
 
 *Published, rounded values (blue) against the ideal ISO 226 target (grey), with the headroom adjustment applied. Most DSPs draw this curve as you type — yours should end up the same shape.*

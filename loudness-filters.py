@@ -597,7 +597,12 @@ def _image_block(comp, image, null):
         "*Published, rounded values (blue) against the ideal ISO 226 target "
         "(grey), with the headroom adjustment applied. Most DSPs draw this "
         "curve as you type — yours should end up the same shape.*")
+    # A rule, not a blank line: Markdown collapses blank lines, so a table's
+    # bottom border would otherwise sit directly against the plot. It reads as
+    # what it is -- the values end here, and a picture of them follows.
     return [
+        "---",
+        "",
         f"![Frequency response at {_level_str(comp.level)} dB]({image})",
         "",
         caption,

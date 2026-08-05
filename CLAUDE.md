@@ -27,8 +27,8 @@ python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 python check.py --level <db> [--reference <db>] [--scale <s>]
 
 # Regression tests — run after touching any math
-python -m pytest tests/                  # all 124 (~30 s)
-python -m pytest tests/ -m "not slow"    # 113 fast ones (~1 s)
+python -m pytest tests/                  # all 125 (~30 s)
+python -m pytest tests/ -m "not slow"    # 114 fast ones (~1 s)
 
 # Rebuild every committed preset and figure (several minutes)
 python regenerate.py
@@ -283,7 +283,10 @@ lives in `regenerate.py` — so this applies to anything new.)
   argument — the link text comes from the caller, so the relative hop out of
   `PEQ/` is `regenerate.py`'s knowledge and not the generator's. The plot is a
   confirmation aid: hosts draw a curve while filters are entered, and a
-  listener can compare shapes. Two consequences: every preset now needs a
+  listener can compare shapes. A `---` rule separates it from the table:
+  Markdown collapses blank lines, so the gap has to be a block of its own, and
+  the blank line *before* the rule is load-bearing too — without it the line
+  above becomes a setext heading. Two consequences: every preset now needs a
   response plot in `images/`, not just `FEATURED` (which now selects only the
   extra *error* plots the README quotes), and the image line sits in the file
   `check.py` parses — it is not a table row, and

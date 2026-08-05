@@ -105,6 +105,24 @@ def test_embedded_plot_does_not_disturb_the_table(lf, tmp_path):
     assert parse_markdown_metadata(str(path)) == (83.0, 1.0)
 
 
+def test_a_rule_separates_the_table_from_the_plot(lf, tmp_path):
+    """Markdown collapses blank lines, so the gap has to be a real block.
+
+    Losing this is invisible in the source and only shows up as a plot jammed
+    against the table's bottom border on the rendered page. The blank line
+    before the rule is load-bearing too: without it the preceding line becomes
+    a setext heading instead.
+    """
+    path = tmp_path / "filter_83_to_65_s1.0.md"
+    lf.write_markdown_table(SYNTHETIC, Compensation(65.0), -9.5, str(path),
+                            "filter_83_to_65_s1.0.png")
+    lines = path.read_text().splitlines()
+    image = next(i for i, line in enumerate(lines) if line.startswith("!["))
+    rule = lines.index("---", image - 3, image)
+    assert lines[rule - 1] == "", "the rule would be read as a setext heading"
+    assert lines[rule + 1] == ""
+
+
 def test_no_plot_is_embedded_unless_one_is_named(lf, tmp_path):
     """A page written without an image must not link one that is not there."""
     path = tmp_path / "filter_83_to_65_s1.0.md"
