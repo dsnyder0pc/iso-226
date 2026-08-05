@@ -189,10 +189,10 @@ wildly different levels and no static preset can be right for long.
 
 ### How precise do you need to be?
 
-Not very. Adjacent 5 dB presets differ by about **2.6 dB** of bass — clearly
-audible, which is why 5 dB steps are the right granularity. Being within
-±2–3 dB on `--level` is entirely good enough, and finer preset steps would not
-be useful.
+Not very. Adjacent rungs of the 3 dB ladder differ by about **1.6 dB** of bass,
+so snapping to the nearer one costs at most about **0.8 dB** — under the
+uncertainty of a typical SPL measurement, which is why finer steps would not be
+useful. Being within ±2–3 dB on `--level` is entirely good enough.
 
 ---
 
