@@ -9,6 +9,7 @@ ones most likely to earn their keep during future edits.
 The slow tests run the optimizer. Skip them with `-m "not slow"`.
 """
 
+import json
 import os
 import re
 import sys
@@ -373,3 +374,31 @@ def test_committed_preset_publishes_its_own_headroom(stem, path):
         f"{stem} publishes {published} dB but needs {-computed:.4f} dB")
     assert -published - computed <= 0.1 + 1e-9, (
         f"{stem} publishes {published} dB, more than 0.1 dB of slack")
+
+
+def test_api_grid_matches_the_committed_presets():
+    """web/presets.json and REW/ must publish the same filters.
+
+    They are produced by different commands -- regenerate.py and
+    precompute_presets.py -- so a maths change that reruns one and not the
+    other would leave the website serving filters the repository does not
+    publish. Nothing else notices.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "web", "presets.json"), encoding="utf-8") as fh:
+        grid = json.load(fh)["presets"]
+
+    checked = 0
+    for stem, path in _committed_presets():
+        level = int(stem.split("_to_")[1].split("_")[0])
+        entry = grid.get(f"{level - 83:+d}|1.00")
+        assert entry is not None and not entry["refused"], (
+            f"{stem} ships in REW/ but the API grid cannot serve it")
+        published = [tuple(row) for row in parse_markdown_filters(path)]
+        served = [(f["type"], f["frequency"], f["gain"], f["q"])
+                  for f in entry["filters"]]
+        assert published == served, (
+            f"{stem}: REW/ and web/presets.json disagree. "
+            f"Rerun both regenerate.py and precompute_presets.py.")
+        checked += 1
+    assert checked >= 10, "expected the whole committed ladder to be compared"

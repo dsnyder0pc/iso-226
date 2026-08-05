@@ -1,5 +1,5 @@
 {
- "generated_utc": "2026-08-04T22:57:32+00:00",
+ "generated_utc": "2026-08-05T00:12:58+00:00",
  "iso_edition": "ISO 226:2023",
  "band_count": 5,
  "design_fs": 44100.0,
@@ -18,46 +18,10 @@
    "offset": 0,
    "scale": 1.0,
    "refused": false,
-   "headroom_db": -0.0,
+   "headroom_db": 0.0,
    "max_residual_db": 0.0,
    "target_met": true,
-   "filters": [
-    {
-     "band": 1,
-     "type": "Low Shelf",
-     "frequency": 60.0,
-     "gain": 0.0,
-     "q": 0.7
-    },
-    {
-     "band": 2,
-     "type": "Peak",
-     "frequency": 232.4,
-     "gain": 0.0,
-     "q": 0.7
-    },
-    {
-     "band": 3,
-     "type": "Peak",
-     "frequency": 848.5,
-     "gain": 0.0,
-     "q": 0.7
-    },
-    {
-     "band": 4,
-     "type": "Peak",
-     "frequency": 2966.0,
-     "gain": 0.0,
-     "q": 0.7
-    },
-    {
-     "band": 5,
-     "type": "High Shelf",
-     "frequency": 8124.0,
-     "gain": 0.0,
-     "q": 0.7
-    }
-   ]
+   "filters": []
   },
   "+1|1.00": {
    "offset": 1,

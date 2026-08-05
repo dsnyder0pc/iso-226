@@ -20,6 +20,7 @@ import os
 import re
 
 from flask import Flask, jsonify, request
+from werkzeug.exceptions import HTTPException
 
 API_VERSION = "1"
 
@@ -232,6 +233,12 @@ def filters():
             f"within {DATA['equivalence_tolerance_db']} dB over references "
             f"72-85 dB.")
 
+    if offset == 0:
+        notes.append(
+            "You are listening at the level this recording was mastered for, "
+            "so there is nothing to correct. Apply no filters and no headroom "
+            "adjustment, and disable any preset left over from another level.")
+
     if not OFFSET_MIN <= offset <= OFFSET_MAX:
         return _error(
             "offset_unavailable",
@@ -321,6 +328,17 @@ def _not_found(_exc):
 @app.errorhandler(405)
 def _method_not_allowed(_exc):
     return _error("method_not_allowed", "This endpoint accepts GET only.", 405)
+
+
+@app.errorhandler(HTTPException)
+def _http_exception(exc):
+    """Anything Werkzeug raises that has no handler above.
+
+    Without this, the catch-all below would turn a 414 or a 400 from the
+    framework into a 500 -- reporting a server fault for a client mistake.
+    Keep the status, replace the HTML body.
+    """
+    return _error("http_error", exc.description or exc.name, exc.code or 500)
 
 
 @app.errorhandler(Exception)

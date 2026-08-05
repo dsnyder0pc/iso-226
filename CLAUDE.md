@@ -128,6 +128,26 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
   imports `preset_stem` from the generator so both agree on filenames, and
   shells out to generate the preset if that file does not exist yet.
 
+- **`precompute_presets.py` + `web/`** — the HTTP API.
+  - A fit takes 20–45 s, which cannot happen inside a request. It does not have
+    to: the curve depends on `level - reference`, so the space collapses to one
+    offset axis. `precompute_presets.py` fits that grid offline and writes
+    `web/presets.json`; `web/app.py` is a dictionary lookup over it.
+  - **`web/` must never import NumPy or SciPy.** That is the whole point — 42 MB
+    resident against 108 MB, which is what fits a 1 GB droplet. If the API ever
+    needs to fit something, the answer is to widen the grid, not to import the
+    generator.
+  - **There are now two generated artifacts, and nothing keeps them in step
+    automatically.** `regenerate.py` writes `REW/`; `precompute_presets.py`
+    writes `web/presets.json`. Change the math and you must run **both**, or the
+    website will serve different filters from the ones the repository publishes.
+    `test_api_grid_matches_the_committed_presets` fails when they diverge — that
+    test is the only thing standing between a maths change and a silently stale
+    API.
+  - `web/openapi.yaml` is the contract handed to front-end authors and code
+    generators. Its examples are copied from live responses and asserted against
+    them, so it cannot drift silently either.
+
 - **`tests/test_iso226.py`** — the math. `test_matches_published_annex_b` and
   the shelf-property tests are the ones that matter: they are the only checks
   not sharing code with the thing under test. The shelf tests caught a sign
