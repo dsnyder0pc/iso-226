@@ -89,32 +89,44 @@ that needs to change when the filter maths does.
 
 ## Deploying
 
+One command, and the same one on every host:
+
 ```bash
-sudo apt install python3-venv nginx
-python3 -m venv /opt/iso226/venv
-/opt/iso226/venv/bin/pip install -r requirements.txt
+sudo ./deploy/install.sh
 ```
 
-Copy `app.py` and `presets.json` to `/opt/iso226/`, then:
+It creates `/opt/iso226`, builds a venv there from `requirements.txt`, installs
+`app.py` and `presets.json` root-owned and world-readable, installs and enables
+`deploy/iso226-api.service`, and then waits for the service to actually answer
+before reporting success. Run it again to ship a new `presets.json` — it is
+idempotent, and shipping new filters is the same command as installing.
 
-```ini
-# /etc/systemd/system/iso226-api.service
-[Unit]
-Description=Equal-loudness filter API
-After=network.target
+Nothing in it is distribution-specific. The unit runs under `DynamicUser=yes`,
+so systemd allocates a transient UID at start and releases it at stop: there is
+no service account to create, and no `www-data`-versus-`http` difference between
+Debian and Arch. It reads its own files and binds one loopback socket; it owns
+nothing that has to outlive it. If a particular host needs a real user anyway:
 
-[Service]
-User=www-data
-WorkingDirectory=/opt/iso226
-Environment=PRESETS_PATH=/opt/iso226/presets.json
-ExecStart=/opt/iso226/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 app:app
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
+```bash
+sudo systemctl edit iso226-api
+# [Service]
+# DynamicUser=no
+# User=http
 ```
+
+The unit is sandboxed to match — `ProtectSystem=strict`, `ProtectHome`,
+`PrivateTmp`, a `@system-service` syscall filter, and `IPAddressDeny=any` with
+loopback allowed, since it must never talk to anything but nginx.
 
 Two workers is right for one vCPU: requests are microseconds of dictionary
 lookup, so the limit is concurrency of I/O rather than CPU. Put nginx in front
 for TLS, and consider a `proxy_cache` or long `Cache-Control` — the responses
 are immutable for a given `presets.json`.
+
+### Useful afterwards
+
+```bash
+systemctl status iso226-api
+journalctl -u iso226-api -f          # gunicorn logs to stdout, so this is them
+sudo systemctl restart iso226-api
+```

@@ -1,0 +1,87 @@
+# Equal-loudness filter API.
+#
+# Installed by deploy/install.sh, which is the only thing that should write
+# /opt/iso226. nginx sits in front for TLS and logging; this listens on
+# loopback only and is never reachable directly.
+#
+# The service runs under DynamicUser, so there is no account to create and
+# this file is identical on Arch and Debian. To pin a real user on a host
+# that needs one -- shared file ownership, say, or a log-attribution policy:
+#
+#     sudo systemctl edit iso226-api
+#     [Service]
+#     DynamicUser=no
+#     User=http            # www-data on Debian
+#
+# Nothing in this unit has to change for that.
+
+[Unit]
+Description=Equal-loudness compensation filter API
+Documentation=https://github.com/dsnyder0pc/iso-226
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# A transient UID, allocated at start and released at stop. The process reads
+# its own files and binds a loopback socket; it owns nothing and needs no
+# identity that outlives it.
+DynamicUser=yes
+
+WorkingDirectory=/opt/iso226
+Environment=PRESETS_PATH=/opt/iso226/presets.json
+
+# Two workers is right for one vCPU: a request is a dictionary lookup, so the
+# limit is I/O concurrency rather than CPU. Bound to loopback deliberately --
+# putting this on 0.0.0.0 would publish it around nginx.
+ExecStart=/opt/iso226/venv/bin/gunicorn \
+    --workers 2 \
+    --bind 127.0.0.1:8000 \
+    --access-logfile - \
+    --error-logfile - \
+    app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+
+Restart=on-failure
+RestartSec=2s
+
+# Sandboxing. The process needs to read /opt/iso226 and open one TCP socket;
+# everything else is denied, so a defect in a JSON parser has nowhere to go.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectProc=invisible
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectClock=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+
+# It binds a high port and reads three files. There is no capability in the
+# set that it wants, so it is handed none -- an empty bounding set, not a
+# list to keep pruning as the service changes.
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+SystemCallFilter=@system-service
+# One '~' governs the whole line; a second one would be read as a syscall name.
+SystemCallFilter=~@privileged @resources
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressAllow=localhost
+IPAddressDeny=any
+
+# It creates no files. Should that ever change, they are its own business.
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
