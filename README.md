@@ -318,6 +318,65 @@ holds a few, which is enough.
 The page is built for a desktop or tablet screen. It works on a phone, but the
 filter table needs a horizontal scroll in portrait orientation.
 
+### "Hear it" is a toy, not an instrument
+
+**Hear it** plays looping pink noise through the preset on screen, and **Bypass**
+takes the filters out while leaving the headroom in — so the two sides are
+matched at 1 kHz, where the compensation is 0 dB by definition, and only the tilt
+changes. Its job is to make the slider audible: to let you hear what a 65 dB
+correction sounds like next to an 85 dB one before you type anything into a
+player. That is the whole of its job.
+
+#### Two comparisons, and why they behave differently
+
+There are deliberately two ways to hear the effect, and they answer different
+questions — so it is worth knowing that one holds the loudness still and the
+other does not.
+
+- **Filters on / off, at one level.** This one is level-matched: the bypass takes
+  the bands out but keeps the headroom in, and the compensation is 0 dB at 1 kHz
+  by definition, so the midrange sits in the same place either way. Only the tilt
+  moves. It is the same flat reference the plot draws as a dotted line. This is
+  the A/B for *what a given preset does*.
+- **Moving the level slider while it plays.** This one gets quieter as you head
+  down the ladder, and that is the honest answer rather than a fault. A quieter
+  listening level needs a deeper correction, a deeper correction boosts the
+  extremes further, and the headroom adjustment has to cut by more to keep the
+  peaks under 0 dBFS — so at an 83 dB reference the 62 dB preset asks for
+  −11.0 dB against the 83 dB rung's 0.0 dB, and sounds exactly that much quieter
+  at the same digital volume. It is showing you the preamp. This is the A/B for
+  *what the ladder does*.
+
+In real use that drop is not something you live with: you turn the volume up to
+reach the listening level the preset was fitted for, which is the point of
+measuring it. The preview leaves the volume where it is, so the attenuation
+becomes audible instead.
+
+#### Where it stops being useful
+
+**Do not use it to calibrate anything, to check headroom, or to judge whether a
+preset is right.** Three things are approximate about it, by design:
+
+- **Those are not these filters.** The page hands the published frequency, gain
+  and Q to the browser's own Web Audio biquads — not to the RBJ sections this
+  project designs, verifies and publishes with. Every curve and number the page
+  *draws* comes from the generator; only the sound comes from the browser.
+  ([Why the page evaluates no filters of its own](#honest-limitations) is the
+  same reasoning: a second implementation of the coefficients is a second place
+  for an error to hide.)
+- **Not the design rate.** Web Audio runs at whatever the output device is using
+  — usually 48 kHz, sometimes 44.1 — while these filters are designed and their
+  headroom verified at 44.1 kHz. The page reports the rate it actually got, next
+  to the button.
+- **Not a calibrated source.** The noise is a cheap one-pole pink generator good
+  to about ±0.5 dB, played through your system volume, whatever else your player
+  is doing, your DAC, your transducers and your room. None of that is controlled.
+
+For anything that has to be right, enter the headroom adjustment and the five
+filters into a real PEQ — Roon, CamillaDSP, Equalizer APO, a hardware DSP — or
+load one of the ready-made configs, and measure the result. That path is
+[Importing into REW, Roon and other DSPs](#importing-into-rew-roon-and-other-dsps).
+
 ---
 
 ## Importing into REW, Roon and other DSPs
