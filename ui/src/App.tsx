@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Header } from './components/Header';
@@ -14,6 +15,8 @@ import type { Bounds } from './url';
 import { listeningQuery, readListening, shareUrl } from './url';
 
 const DEFAULT_OFFSET = -15;
+
+const REPO_URL = 'https://github.com/dsnyder0pc/iso-226';
 
 const URL_BOUNDS: Bounds = {
   reference: REFERENCE_RANGE,
@@ -155,15 +158,35 @@ function NoCorrectionNeeded() {
   );
 }
 
+/** Opens in a new tab: leaving mid-comparison should not cost the level on screen. */
+function RepoLink({ children }: { children: ReactNode }) {
+  return (
+    <a
+      href={REPO_URL}
+      target="_blank"
+      rel="noreferrer"
+      className="text-slate-400 underline decoration-slate-600 underline-offset-2 hover:text-accent"
+    >
+      {children}
+    </a>
+  );
+}
+
 function Provenance() {
   return (
     <footer className="rounded-3xl border border-slate-800/70 bg-panel/50 p-6 text-[11px] leading-relaxed text-slate-500">
       <p>
         Every curve and number on this page was computed by the same Python that
-        generates the presets in the repository, and shipped with it. The browser
-        adds decibels and subtracts a target; it evaluates no filters and
-        interpolates no levels. Presets exist at whole-decibel offsets, so the
-        slider steps in whole decibels.
+        generates the presets in <RepoLink>the repository</RepoLink>, and shipped
+        with it. The browser adds decibels and subtracts a target; it evaluates no
+        filters and interpolates no levels. Presets exist at whole-decibel
+        offsets, so the slider steps in whole decibels.
+      </p>
+      <p className="mt-2">
+        The <RepoLink>README</RepoLink> there covers what this page does not: how
+        to measure your listening level, where the ISO 226:2023 data comes from
+        and why it is not redistributed, why five bands are enough, and why the
+        quietest levels are refused rather than approximated.
       </p>
       <p className="mt-2">
         Measure the listening level broadband, C-weighted, slow. A measurement
