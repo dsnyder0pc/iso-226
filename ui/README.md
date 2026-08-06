@@ -19,12 +19,21 @@ npm run verify  # tsc --noEmit, then the export golden check
 npm run build   # writes dist/
 ```
 
-`dist/` is a plain `index.html` plus one JavaScript and one CSS file. Copy it
-anywhere that serves static files:
+**Deploy `dist/`, never `ui/`.** The `index.html` in this directory is Vite's
+development entry: it points at `/src/main.tsx`, which no browser can execute,
+so serving this directory gets you a blank page and a 404 for a TypeScript
+file. Only `npm run build` produces something servable.
+
+`dist/` is a plain `index.html` plus one JavaScript and one CSS file, about
+500 KB in total. Copy it anywhere that serves static files:
 
 ```bash
-rsync -a dist/ user@host:/var/www/iso226-ui/
+rsync -a --delete dist/ user@host:/var/www/iso226-ui/
 ```
+
+The trailing slash on `dist/` puts those three files at the target root rather
+than in a `dist` subdirectory. Nothing else belongs on the server — not
+`node_modules` (142 MB), not `src/`, not this file.
 
 An nginx `root` pointing at that directory is the entire server configuration.
 Asset URLs are relative, so the page works from a subdirectory of a host as
