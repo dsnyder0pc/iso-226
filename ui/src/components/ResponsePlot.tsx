@@ -59,7 +59,11 @@ export function ResponsePlot({ data }: Props) {
       <div className="rounded-2xl border border-slate-800 bg-ink p-1 sm:p-2">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          className="w-full touch-none"
+          // pan-y, not none: the plot is a tall slab of a touch screen, and
+          // touch-action: none there means a finger swiped over it cannot
+          // scroll the page. Vertical drags stay with the browser; horizontal
+          // ones still reach the crosshair.
+          className="w-full touch-pan-y"
           role="img"
           aria-label={describe(data)}
           onPointerMove={(event) => {
@@ -68,6 +72,10 @@ export function ResponsePlot({ data }: Props) {
             setHover(nearestIndex(hzAt(x)));
           }}
           onPointerLeave={() => setHover(null)}
+          // A touch readout survives lifting the finger -- that is how you
+          // read a value on a tablet -- but not the browser stealing the
+          // gesture to scroll, which would strand the crosshair mid-page.
+          onPointerCancel={() => setHover(null)}
         >
           <defs>
             <clipPath id="residual-strip">

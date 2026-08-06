@@ -70,6 +70,10 @@ export function useAudioPreview() {
 
   const start = useCallback((filters: Filter[], headroomDb: number) => {
     const context = new AudioContext();
+    // iOS Safari can hand back a suspended context even when it was created
+    // inside the click that asked for it, and a suspended context plays
+    // nothing without complaining.
+    void context.resume();
     const source = context.createBufferSource();
     source.buffer = pinkNoise(context);
     source.loop = true;
