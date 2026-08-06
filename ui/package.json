@@ -1,0 +1,32 @@
+{
+  "name": "iso226-loudness-ui",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Static browser UI for the ISO 226:2023 equal-loudness compensation presets",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "check:exports": "tsx scripts/check-exports.ts",
+    "check:suggestions": "tsx scripts/check-suggestions.ts",
+    "verify": "npm run typecheck && npm run check:exports && npm run check:suggestions"
+  },
+  "dependencies": {
+    "lucide-react": "^0.546.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  }
+}

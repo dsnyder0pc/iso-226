@@ -27,17 +27,23 @@ python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
 python check.py --level <db> [--reference <db>] [--scale <s>]
 
 # Regression tests — run after touching any math
-python -m pytest tests/                  # all 167 (~30 s)
-python -m pytest tests/ -m "not slow"    # 156 fast ones (~1 s)
+python -m pytest tests/                  # all 175 (~30 s)
+python -m pytest tests/ -m "not slow"    # 164 fast ones (~1 s)
 
 # Rebuild every committed preset and figure (several minutes)
 python regenerate.py
 python regenerate.py --list              # what would be generated, without doing it
 
+# Refit web/presets.json + web/curves.json (~40 min on four cores)
+python precompute_presets.py
+
 # Linters — both must be clean before committing
 python -m pylint check.py loudness-filters.py iso226_utils.py \
     regenerate.py precompute_presets.py web/app.py tests/
 shellcheck -S style path/to/script.sh    # any Bash added to the repo
+
+# The browser UI (needs Node; nothing that serves it does)
+cd ui && npm install && npm run verify && npm run build
 ```
 
 `regenerate.py` is the single source of truth for which presets ship — the
@@ -55,6 +61,13 @@ A generator run takes 20–45 s (constrained minimax, multistart). Runtime is
 data-dependent now: the search stops when it reaches its target, stagnates, or
 hits `MAX_RESTARTS`, so a hard level like 62 dB costs twice an easy one. Batch
 regeneration of the whole ladder is ~5.5 minutes — run it in the background.
+
+`precompute_presets.py` is a different order of cost: 35 grid points, of which
+the four refusals and the extremes of the ladder exhaust all 24 restarts.
+Measured at ~40 minutes on four workers, not the ~6 the preset count suggests.
+Always background it. The fit is seeded (`seed=3`), so a rerun reproduces the
+committed filters exactly — a refit that changes a single published value means
+the maths changed, and the diff is the evidence.
 
 **Environment note:** the project uses a pyenv virtualenv named `iso-226`
 (`.python-version`), which auto-activates only inside the project directory.
@@ -140,14 +153,16 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     resident against 108 MB, which is what fits a 1 GB droplet. If the API ever
     needs to fit something, the answer is to widen the grid, not to import the
     generator.
-  - **There are now two generated artifacts, and nothing keeps them in step
+  - **There are now three generated artifacts, and nothing keeps them in step
     automatically.** `regenerate.py` writes `PEQ/`, `REW/` and `images/`;
-    `precompute_presets.py`
-    writes `web/presets.json`. Change the math and you must run **both**, or the
-    website will serve different filters from the ones the repository publishes.
-    `test_api_grid_matches_the_committed_presets` fails when they diverge — that
-    test is the only thing standing between a maths change and a silently stale
-    API.
+    `precompute_presets.py` writes `web/presets.json` **and** `web/curves.json`
+    in one run. Change the math and you must run **both commands**, or the
+    website will serve different filters from the ones the repository
+    publishes. `test_api_grid_matches_the_committed_presets` fails when the
+    tables and the API diverge; `tests/test_curves.py` fails when the two JSON
+    artifacts come from different runs, or when a stored curve stops matching
+    the filters beside it. Those tests are the only thing standing between a
+    maths change and a silently stale page.
   - `web/openapi.yaml` is the contract handed to front-end authors and code
     generators. Its examples are copied from live responses and asserted against
     them by `test_documented_examples_match_live_responses`, which rebuilds each
@@ -164,6 +179,56 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     message sent callers to levels that were fitted, refused and unavailable;
     `test_every_suggested_level_can_actually_be_served` now holds the API to the
     same rule the CLI's `suggest_alternatives` follows.
+
+- **`ui/`** — the static browser page. Vite + React + TypeScript, no backend.
+  - **The plot grid *is* the design grid.** `web/curves.json` samples on
+    `np.concatenate(design_grid())` — the 182 points the optimizer fitted
+    against, 10 Hz–20 kHz. That identity is load-bearing three times over: the
+    stored target is `build_target(comp).target` including its flat-held
+    extrapolation, so the page can show the held regions instead of cropping
+    them; `in_band` is the same slice the objective minimizes over, so the
+    residual the curves imply *is* the published `max_residual_db` rather than
+    something near it; and there is no second definition of where the ISO data
+    stops. Do not resample it onto a rounder grid for the plot.
+  - **No DSP in the browser.** Bands are stored separately and summed in
+    JavaScript — magnitudes multiply, so decibels add, and the sum is the
+    cascade response exactly (checked to 5e-15). The page adds decibels and
+    subtracts a target; it evaluates no biquads. This is deliberate: the RBJ
+    coefficients already shipped a sign error once, and a second implementation
+    of them in another language is a second place for that to happen. The
+    predecessor of this UI drew a *fabricated* target — `response + sin(...)` —
+    which no test could have caught, because nothing tied its picture to the
+    numbers. `tests/test_curves.py` is that tie.
+  - **`ui/` imports `web/*.json`; it must never hold a copy.** The prototype
+    kept a byte-identical duplicate of `presets.json` in its own tree.
+    `test_the_ui_keeps_no_copy_of_the_generated_data` forbids it.
+  - `src/export/formats.ts` is the one place the UI reimplements a repository
+    format rather than reading one, so `npm run check:exports` diffs its
+    CamillaDSP output against every committed `REW/*.yml`. It is an npm script,
+    not a pytest test, for the same reason Flask is absent from the root
+    `requirements.txt`: the Python suite must not require a JavaScript
+    toolchain. The pass-through preset is skipped there — `REW/` ships five
+    zero-gain bands so the file stays a loadable config, while the API
+    publishes it as no filters at all.
+  - **JavaScript prints a negative zero without its sign.** `(-0).toFixed(1)`
+    is `"0.0"`, where Python gives `-0.0`, and three committed configs carry a
+    band that rounds a hair below zero. `fixed()` in `src/format.ts` puts the
+    sign back; every gain and Q in every emitter goes through it. A Python
+    emulation of the emitter matched all 13 files and missed this — only
+    running the real thing found it.
+  - **Refusal messages name a level twice**, the one that failed and the one to
+    try instead, so `parseRefusal` reads only the text after `Try one of:`.
+    Reading the first match offered the user 58 dB as the way out of 58 dB
+    being unavailable. `npm run check:suggestions` is the UI's copy of
+    `test_every_suggested_level_can_actually_be_served`; `src/data/refusal.ts`
+    is import-free so that script can run it under Node.
+  - **The page does not work from `file://`** — the entry is an ES module and
+    browsers block those from a null origin, so it renders blank. Verified, not
+    assumed. Any static server works, including `npm run preview`.
+  - Both vertical scales on the plot are fixed across the whole ladder rather
+    than fitted to the level on screen, so dragging the slider shows the
+    correction growing and the residual worsening at the quiet end. 60 dB
+    *looking* worse than 70 dB is the point.
 
 - **`tests/test_api.py`** — the HTTP service, through Flask's test client: no
   server, no port, no gunicorn, 0.3 s for the file. Flask is deliberately absent

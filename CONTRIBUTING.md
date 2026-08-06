@@ -87,6 +87,11 @@ python check.py --level <db> [--reference <db>] [--scale <s>]
 # Rebuild every committed preset and figure (~5.5 minutes)
 python regenerate.py
 python regenerate.py --list          # what would be built, without building it
+
+# Refit the grid the website and the browser page are served from
+# (~40 minutes on four cores — much longer per preset than regenerate.py,
+#  because the refused offsets and the deep end exhaust every restart)
+python precompute_presets.py
 ```
 
 `regenerate.py` is the single source of truth for which presets ship — the
@@ -95,6 +100,13 @@ python regenerate.py --list          # what would be built, without building it
 Run it after any change to the math, the optimizer or the coefficients, then
 reconcile the README, which quotes headroom values, residual errors and filter
 tables.
+
+**Run `precompute_presets.py` as well.** It writes two files — `web/presets.json`
+for the HTTP API and `web/curves.json` for the browser page — and they are what
+the website and the static UI serve. A maths change applied to one command and
+not the other leaves them publishing different filters;
+`test_api_grid_matches_the_committed_presets` and `tests/test_curves.py` fail
+when that happens, which is the only thing that catches it.
 
 It is also the only thing that knows the repository layout: the generator
 writes to the working directory, and `regenerate.py` places each preset's
@@ -112,8 +124,8 @@ so a hard level like 62 dB costs about twice an easy one.
 ## Tests
 
 ```bash
-python -m pytest tests/                  # all 167 (~30 s)
-python -m pytest tests/ -m "not slow"    # 156 fast ones (~1 s)
+python -m pytest tests/                  # all 175 (~30 s)
+python -m pytest tests/ -m "not slow"    # 164 fast ones (~1 s)
 ```
 
 The `slow` ones generate a real preset and assert what actually ships: that no
@@ -145,6 +157,38 @@ validate live responses against the schemas declared in `web/openapi.yaml`
 (OpenAPI 3.1 schemas are JSON Schema 2020-12, so they are used directly), and
 assert the spec's examples against real responses, so the contract cannot drift
 from the implementation in silence.
+
+### The browser page
+
+`ui/` is a static page: Vite, React and TypeScript, with no backend and nothing
+to install unless you are changing it. Its build needs Node; nothing that
+*serves* it does. See `ui/README.md`.
+
+```bash
+cd ui
+npm install         # first time — commit the package-lock.json; npm ci after that
+npm run verify      # tsc --noEmit, then the CamillaDSP export golden check
+npm run build       # writes ui/dist/
+```
+
+`npm run verify` must be clean before committing anything under `ui/`, the same
+way pylint must be clean before committing Python. It runs three things:
+`tsc --noEmit`; an export check, because `src/export/formats.ts` is the only
+place the page reimplements a repository format instead of reading one, so it
+regenerates the CamillaDSP YAML for every committed preset and diffs it against
+`REW/*.yml`; and a suggestion check, the UI's copy of
+`test_every_suggested_level_can_actually_be_served`.
+
+Both checks were written against bugs they then found, which is the standard
+worth holding them to: JavaScript prints a negative zero without its sign, so
+the `-0.0` in three committed configs came out as `0.0`; and reading the first
+`--level` in a refusal message offers the user the level that just failed.
+
+The page's own data is checked from the Python side instead, by
+`tests/test_curves.py`, which asserts that every curve in `web/curves.json` is
+the output of the function that should have produced it. That is deliberate —
+it means a contributor working on the maths needs no JavaScript toolchain to
+find out they have invalidated the picture.
 
 ### Why the suite anchors on things the project does not compute
 

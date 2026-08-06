@@ -17,6 +17,14 @@ The consequence is that **this service needs neither NumPy nor SciPy**. It is
 Flask plus a JSON file, which is what makes it comfortable on a 1 GB / 1 vCPU
 droplet.
 
+`precompute_presets.py` writes a second file into this directory,
+`curves.json`, which the service does not read: it holds the plotted target and
+per-band response curves for the static page in `ui/`. It lives here so that
+the page and the API import the same generated data instead of each keeping a
+copy, and `deploy/install.sh` names the files it ships, so it never reaches the
+droplet. Both carry the same `generated_utc`, and `tests/test_curves.py` fails
+if they ever come from different runs.
+
 ## Endpoints
 
 ```

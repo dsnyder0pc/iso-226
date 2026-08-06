@@ -288,6 +288,14 @@ These need neither Python nor a copy of the standard. Every preset for an 83 dB
 mastering reference ships in two forms: a **table** in [PEQ](PEQ) to read and
 type in by hand, and a **CamillaDSP YAML** file in [REW](REW) to load.
 
+There is also an **interactive version** in [ui](ui): one page with a listening
+level slider, the response and the residual error redrawing as you move it, and
+the same filters ready to copy in five formats. It serves exactly the values
+below — the curves it draws were computed by the code that produced the tables
+and shipped alongside them, not recalculated in the browser — and it is a
+static page, so it needs no server. Building it is in
+[CONTRIBUTING.md](CONTRIBUTING.md#the-browser-page).
+
 | Preset | Listening level | Relative to reference |
 | :--- | :--- | :--- |
 | [table](PEQ/filter_83_to_60_s1.0.md) · [yaml](REW/filter_83_to_60_s1.0.yml) | 60 dB — the floor | −23 dB |

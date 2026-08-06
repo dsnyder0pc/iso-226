@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    // "node" is here for scripts/check-exports.ts, which runs outside the
+    // browser. Nothing under src/ may use a Node global.
+    "types": ["vite/client", "node"],
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+
+    // resolveJsonModule is deliberately OFF. The generated data is ~34,000
+    // floats; letting tsc infer a literal type for it makes a typecheck take
+    // minutes. src/data/json.d.ts types those imports as `unknown` instead,
+    // and src/data/index.ts narrows them through declared interfaces once.
+    "resolveJsonModule": false
+  },
+  "include": ["src", "scripts"]
+}
