@@ -42,7 +42,7 @@ export function ResponsePlot({ data }: Props) {
   }
 
   const served = data.kind === 'served' ? data : null;
-  const readout = hover === null ? null : readoutAt(data, hover);
+  const readout = hover === null ? null : readoutAt(data, hover, paths.shift);
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-panel p-4 shadow-xl sm:p-6">
@@ -52,7 +52,10 @@ export function ResponsePlot({ data }: Props) {
           Frequency response
         </h2>
         <p className="font-mono text-[11px] text-slate-500">
-          {meta.gridHz.length} points · evaluated at {(meta.designFs / 1000).toFixed(1)} kHz
+          {data.kind === 'served'
+            ? `preamp ${data.headroomDb.toFixed(1)} dB applied`
+            : `preamp ${paths.shift.toFixed(1)} dB required`}{' '}
+          · evaluated at {(meta.designFs / 1000).toFixed(1)} kHz
         </p>
       </header>
 
@@ -143,7 +146,7 @@ export function ResponsePlot({ data }: Props) {
                 y1={yOfGain(db)}
                 x2={panels.right}
                 y2={yOfGain(db)}
-                className={db === 0 ? 'stroke-slate-500/70' : 'stroke-slate-700/40'}
+                className="stroke-slate-700/40"
                 strokeWidth={1}
               />
               <text
@@ -156,6 +159,37 @@ export function ResponsePlot({ data }: Props) {
               </text>
             </g>
           ))}
+
+          {/* 0 dBFS. With the preamp applied the response sits below this, which
+              is the whole point of publishing a headroom figure. */}
+          <line
+            x1={panels.left}
+            y1={yOfGain(0)}
+            x2={panels.right}
+            y2={yOfGain(0)}
+            className="stroke-rose-400/70"
+            strokeWidth={1.25}
+            strokeDasharray="6 4"
+          />
+          <text
+            x={HELD_HIGH_X - 8}
+            y={yOfGain(0) - 5}
+            textAnchor="end"
+            className="fill-rose-300/80 text-[10px]"
+          >
+            0 dBFS — clipping
+          </text>
+
+          {/* Where a band contributing nothing lands: the preamp itself. */}
+          <line
+            x1={panels.left}
+            y1={yOfGain(paths.shift)}
+            x2={panels.right}
+            y2={yOfGain(paths.shift)}
+            className="stroke-slate-400/50"
+            strokeWidth={1}
+            strokeDasharray="2 4"
+          />
 
           {/* Individual bands, behind everything they sum to. */}
           {paths.bands.map((d, i) => (
@@ -342,6 +376,8 @@ function Legend({ served }: { served: boolean }) {
       <Key className="bg-target/60" label={`ISO ${meta.isoEdition.slice(4)} target`} />
       {served && <Key className="bg-accent" label="Achieved (published values)" />}
       {served && <Key className="bg-accent/30" label="Individual bands" />}
+      <Key className="bg-rose-400/70" label="0 dBFS" />
+      <Key className="bg-slate-400/50" label="Flat reference (the preamp)" />
       {served && <Key className="bg-emerald-400" label="Residual" />}
       {served && <Key className="bg-amber-400/60" label="± the published max residual" />}
       <span className="text-slate-500">
@@ -370,7 +406,7 @@ interface Readout {
   residual: number | null;
 }
 
-function readoutAt(data: LevelData, index: number): Readout | null {
+function readoutAt(data: LevelData, index: number, shift: number): Readout | null {
   if (data.kind === 'unknown') {
     return null;
   }
@@ -379,11 +415,14 @@ function readoutAt(data: LevelData, index: number): Readout | null {
   if (hz === undefined || target === undefined) {
     return null;
   }
+  const response = data.kind === 'served' ? data.response[index] : undefined;
   return {
     hz,
     x: xOf(hz),
-    target,
-    response: data.kind === 'served' ? (data.response[index] ?? null) : null,
+    // Shifted, so the numbers read off the tooltip are the numbers the axis
+    // shows. The residual is not: the preamp cancels out of a difference.
+    target: target + shift,
+    response: response === undefined ? null : response + shift,
     residual: data.kind === 'served' ? (data.residual[index] ?? null) : null,
   };
 }

@@ -7,6 +7,31 @@
  * rescaling under the cursor and making every level look alike.
  */
 import { levelData, meta } from '../data';
+import type { LevelData } from '../data/types';
+
+/**
+ * The vertical offset the response panel is drawn at: the headroom.
+ *
+ * The committed plots in `PEQ/` add it to both traces and mark 0 dB as the
+ * clipping limit, and this has to match them. Without it a compensation curve
+ * sits almost entirely above zero and reads as a proposal to boost and clip,
+ * when what it actually asks for is attenuation everywhere except the extremes.
+ *
+ * The residual panel is deliberately *not* shifted. Headroom is a constant, so
+ * it cancels out of `response - target` — the error is a property of the
+ * cascade, not of the preamp in front of it.
+ */
+export function displayShift(data: LevelData): number {
+  if (data.kind === 'served') {
+    return data.headroomDb;
+  }
+  if (data.kind === 'refused') {
+    // No filter set exists here, so there is no published headroom. Draw it
+    // against the headroom it would need, which is the reason it is refused.
+    return -Math.max(...data.target);
+  }
+  return 0;
+}
 
 export const WIDTH = 1000;
 export const MARGIN = { left: 58, right: 18, top: 14, bottom: 26 };
@@ -40,9 +65,16 @@ function extremes(): { gain: [number, number]; residual: number } {
     if (data.kind === 'unknown') {
       continue;
     }
+    const shift = displayShift(data);
     for (const db of data.target) {
-      low = Math.min(low, db);
-      high = Math.max(high, db);
+      low = Math.min(low, db + shift);
+      high = Math.max(high, db + shift);
+    }
+    if (data.kind === 'served') {
+      for (const db of data.response) {
+        low = Math.min(low, db + shift);
+        high = Math.max(high, db + shift);
+      }
     }
     if (data.kind === 'served') {
       // In-band only. Outside the ISO range the fit is merely *constrained*,
@@ -156,9 +188,15 @@ interface Paths {
   response: string | null;
   residual: string | null;
   bands: string[];
+  /** Where the flat reference sits: the preamp these curves are drawn against. */
+  shift: number;
 }
 
 const pathCache = new Map<number, Paths>();
+
+function shifted(values: number[], by: number): number[] {
+  return values.map((db) => db + by);
+}
 
 /** Path strings for one level, built once and reused for the rest of the session. */
 export function pathsFor(offset: number): Paths | null {
@@ -170,19 +208,26 @@ export function pathsFor(offset: number): Paths | null {
   if (data.kind === 'unknown') {
     return null;
   }
+  const shift = displayShift(data);
   const built: Paths =
     data.kind === 'served'
       ? {
-          target: pathOf(data.target, yOfGain),
-          response: pathOf(data.response, yOfGain),
+          target: pathOf(shifted(data.target, shift), yOfGain),
+          response: pathOf(shifted(data.response, shift), yOfGain),
+          // Not shifted: the preamp cancels out of a difference.
           residual: pathOf(data.residual, yOfResidual),
-          bands: data.bands.map((band) => pathOf(band, yOfGain)),
+          // Each band is drawn from the flat reference, so its distance from
+          // that line is its contribution and those distances still sum to the
+          // response's. Shifting each by the whole preamp would not.
+          bands: data.bands.map((band) => pathOf(shifted(band, shift), yOfGain)),
+          shift,
         }
       : {
-          target: pathOf(data.target, yOfGain),
+          target: pathOf(shifted(data.target, shift), yOfGain),
           response: null,
           residual: null,
           bands: [],
+          shift,
         };
   pathCache.set(offset, built);
   return built;

@@ -239,6 +239,20 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     than fitted to the level on screen, so dragging the slider shows the
     correction growing and the residual worsening at the quiet end. 60 dB
     *looking* worse than 70 dB is the point.
+  - **The response panel adds the headroom; the residual panel must not.**
+    Both traces on the upper panel are drawn with the preamp applied, against
+    a 0 dBFS clipping line and a dotted flat reference, exactly as
+    `plot_frequency_response` draws the figures in `images/`. This is not
+    cosmetic: without it a compensation curve sits almost entirely *above*
+    zero and reads as a proposal to boost and clip, when what it asks for is
+    attenuation everywhere except the extremes. The residual is the difference
+    of two curves, so the preamp cancels out of it — shifting that panel too
+    would be wrong, and the published `max_residual_db` is measured on the
+    cascade alone. Per-band traces are drawn from the flat reference, so a
+    band's distance from that line is its contribution and those distances
+    still sum to the response's; shifting each band by the whole preamp would
+    not. A refused level has no published headroom, so it is drawn against the
+    headroom it *would* need, which is the reason it was refused.
 
 - **`tests/test_api.py`** — the HTTP service, through Flask's test client: no
   server, no port, no gunicorn, 0.3 s for the file. Flask is deliberately absent
