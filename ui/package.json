@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "check:exports": "tsx scripts/check-exports.ts",
     "check:suggestions": "tsx scripts/check-suggestions.ts",
-    "verify": "npm run typecheck && npm run check:exports && npm run check:suggestions"
+    "check:share-links": "tsx scripts/check-share-links.ts",
+    "verify": "npm run typecheck && npm run check:exports && npm run check:suggestions && npm run check:share-links"
   },
   "dependencies": {
     "lucide-react": "^0.546.0",

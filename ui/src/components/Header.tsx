@@ -1,15 +1,25 @@
 import { Activity, Volume2, VolumeX } from 'lucide-react';
 
 import { meta } from '../data';
+import { ShareButton } from './ShareButton';
 
 interface Props {
   canPreview: boolean;
   playing: boolean;
   sampleRate: number | null;
   onTogglePreview: () => void;
+  shareUrl: string;
+  shareTitle: string;
 }
 
-export function Header({ canPreview, playing, sampleRate, onTogglePreview }: Props) {
+export function Header({
+  canPreview,
+  playing,
+  sampleRate,
+  onTogglePreview,
+  shareUrl,
+  shareTitle,
+}: Props) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-ink/90 px-4 py-4 backdrop-blur-md sm:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -48,6 +58,7 @@ export function Header({ canPreview, playing, sampleRate, onTogglePreview }: Pro
             {playing ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             {playing ? 'Stop preview' : 'Hear it'}
           </button>
+          <ShareButton url={shareUrl} title={shareTitle} />
         </div>
       </div>
     </header>

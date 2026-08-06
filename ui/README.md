@@ -44,6 +44,32 @@ scripts from a null origin, so the page comes up blank. Any static server will
 do instead, including `npm run preview` or `python -m http.server --directory
 dist`. (Verified, not assumed: the file:// attempt renders an empty document.)
 
+## Links
+
+The page's state is in the address bar, under the same two parameter names the
+HTTP API takes and with the same meanings:
+
+```
+https://example.org/ui/?level=71&reference=80
+```
+
+`level` is the measured listening level; `reference` is the level the recording
+was mastered for. The address bar is rewritten as the slider moves (on a short
+delay, and with `replaceState`, so a drag does not become thirty entries of
+browser history), and the share button copies it — or opens the platform share
+sheet on the browsers that have one.
+
+A link carries both numbers rather than the offset that actually keys the data.
+Sending the offset would silently re-target the link at whatever reference the
+recipient had set; sending both says what the sender was looking at and leaves
+the recipient free to change it.
+
+A parameter that is missing, unparseable, or outside what the controls
+themselves accept is ignored in favour of the default, per field. It is not
+clamped: quietly showing a different level from the one the link names would be
+worse than ignoring the link. `npm run check:share-links` round-trips every
+level in the grid and a set of malformed queries.
+
 ## Where the numbers come from
 
 Two generated files, imported directly from `../web` — the same bytes the HTTP
@@ -74,9 +100,11 @@ src/
   components/ the page
   export/     CamillaDSP, Equalizer APO, Roon, CSV, JSON emitters
   audio/      pink-noise preview through WebAudio
+  url.ts      the page's state as a link; pure, so a script can round-trip it
 scripts/
   check-exports.ts      diffs the CamillaDSP emitter against REW/*.yml
   check-suggestions.ts  every level offered instead of a refusal is servable
+  check-share-links.ts  a shared link reopens on the level it was shared from
 ```
 
 `src/export/formats.ts` is the only place the UI reimplements a repository

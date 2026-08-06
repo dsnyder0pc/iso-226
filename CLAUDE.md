@@ -224,7 +224,17 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     is import-free so that script can run it under Node.
   - **The page does not work from `file://`** — the entry is an ES module and
     browsers block those from a null origin, so it renders blank. Verified, not
-    assumed. Any static server works, including `npm run preview`.
+    assumed. Any static server works, including `npm run preview`. What gets
+    deployed is `ui/dist/`, never `ui/`: the source `index.html` is Vite's dev
+    entry and points at `/src/main.tsx`.
+  - **Deep links use `?level=` and `?reference=`** — the API's parameter names,
+    with the API's meanings, so a shared link translates to a curl command by
+    inspection. Not the offset, even though the offset is what keys the data:
+    sending it would re-target a shared link at the recipient's reference
+    instead of the sender's. A bad parameter falls back to the default per
+    field and is never clamped, because showing a different level from the one
+    the link names is worse than ignoring the link. `src/url.ts` is import-free
+    so `npm run check:share-links` can round-trip it under Node.
   - Both vertical scales on the plot are fixed across the whole ladder rather
     than fitted to the level on screen, so dragging the slider shows the
     correction growing and the residual worsening at the quiet end. 60 dB

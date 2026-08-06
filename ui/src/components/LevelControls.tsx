@@ -1,6 +1,6 @@
 import { Disc3, RotateCcw, Volume2 } from 'lucide-react';
 
-import { meta } from '../data';
+import { REFERENCE_RANGE, meta } from '../data';
 import { formatOffset } from '../format';
 
 /**
@@ -126,8 +126,8 @@ export function LevelControls({
             <input
               id="reference"
               type="number"
-              min={60}
-              max={100}
+              min={REFERENCE_RANGE[0]}
+              max={REFERENCE_RANGE[1]}
               step={1}
               value={reference}
               onChange={(event) => onReference(Number(event.target.value))}

@@ -172,12 +172,15 @@ npm run build       # writes ui/dist/
 ```
 
 `npm run verify` must be clean before committing anything under `ui/`, the same
-way pylint must be clean before committing Python. It runs three things:
+way pylint must be clean before committing Python. It runs four things:
 `tsc --noEmit`; an export check, because `src/export/formats.ts` is the only
 place the page reimplements a repository format instead of reading one, so it
 regenerates the CamillaDSP YAML for every committed preset and diffs it against
-`REW/*.yml`; and a suggestion check, the UI's copy of
-`test_every_suggested_level_can_actually_be_served`.
+`REW/*.yml`; a suggestion check, the UI's copy of
+`test_every_suggested_level_can_actually_be_served`; and a link check, which
+round-trips every level in the grid through the `?level=&reference=` deep-link
+parameters and confirms a malformed query falls back rather than inventing a
+state.
 
 Both checks were written against bugs they then found, which is the standard
 worth holding them to: JavaScript prints a negative zero without its sign, so

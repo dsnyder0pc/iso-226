@@ -8,16 +8,50 @@ import { ResponsePlot } from './components/ResponsePlot';
 import { RefusalNotice } from './components/RefusalNotice';
 import { ExportPanel } from './components/ExportPanel';
 import { useAudioPreview } from './audio/useAudioPreview';
-import { levelData, meta, offsetFor } from './data';
+import { REFERENCE_RANGE, levelData, meta, offsetFor } from './data';
 import { formatOffset } from './format';
+import type { Bounds } from './url';
+import { listeningQuery, readListening, shareUrl } from './url';
 
 const DEFAULT_OFFSET = -15;
 
+const URL_BOUNDS: Bounds = {
+  reference: REFERENCE_RANGE,
+  // The fitted range, not the servable one: a refusal is worth linking to.
+  offset: [meta.fitted.min, meta.fitted.max],
+};
+
+// Dragging the slider fires a change per decibel. Safari throttles
+// replaceState to 100 calls per 30 s, so settle before writing.
+const URL_WRITE_DELAY_MS = 250;
+
 export default function App() {
-  const [reference, setReference] = useState(meta.nominalReferenceDb);
-  const [level, setLevel] = useState(meta.nominalReferenceDb + DEFAULT_OFFSET);
+  const [initial] = useState(() =>
+    readListening(
+      window.location.search,
+      { reference: meta.nominalReferenceDb, offset: DEFAULT_OFFSET },
+      URL_BOUNDS,
+    ),
+  );
+  const [reference, setReference] = useState(initial.reference);
+  const [level, setLevel] = useState(initial.level);
 
   const offset = offsetFor(level, reference);
+
+  // Keep the address bar on the level being looked at, so it can be copied,
+  // bookmarked or reloaded. replaceState rather than pushState: a slider is
+  // not thirty entries of browser history.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        window.history.replaceState(null, '', `?${listeningQuery({ level, reference })}`);
+      } catch {
+        // Some embeddings forbid it. The page works; only the link goes stale.
+      }
+    }, URL_WRITE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [level, reference]);
+
   const data = useMemo(() => levelData(offset), [offset]);
   const preview = useAudioPreview();
 
@@ -46,6 +80,11 @@ export default function App() {
         playing={preview.playing}
         sampleRate={preview.sampleRate}
         onTogglePreview={togglePreview}
+        shareUrl={shareUrl(
+          `${window.location.origin}${window.location.pathname}`,
+          { level, reference },
+        )}
+        shareTitle={`Equal-loudness compensation for ${level} dB`}
       />
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 pt-6 sm:px-6 lg:px-8">

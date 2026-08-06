@@ -66,6 +66,16 @@ export const meta = {
   fitted: { min: presetsFile.offset_range_db[0], max: presetsFile.offset_range_db[1] },
 } as const;
 
+/**
+ * What the mastering reference control accepts.
+ *
+ * Wider than the 72-85 dB window the offset equivalence was measured across —
+ * the curve for a given offset is the same either way, it is the claim that
+ * one ladder covers every reference that stops being backed by a measurement.
+ * LevelControls says so when the reference leaves that window.
+ */
+export const REFERENCE_RANGE: [number, number] = [60, 100];
+
 /** The two frequencies the ISO data stops at, for labelling the held regions. */
 export const isoBandHz = {
   low: meta.gridHz[meta.inBand[0]] ?? 20,
