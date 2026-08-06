@@ -21,6 +21,50 @@ over.
 
 ---
 
+## Table of Contents
+
+1.  [Introduction & Context](#introduction--context)
+2.  [Requirements](#requirements)
+3.  [Usage](#usage)
+    - [Generate filters](#generate-filters)
+    - [Verify](#verify)
+    - [Working on the code](#working-on-the-code)
+4.  [How to work out your `--level`](#how-to-work-out-your---level--and-why-it-is-easier-than-it-looks)
+    - [The measurement convention does not have to be exact — only consistent](#the-measurement-convention-does-not-have-to-be-exact--only-consistent)
+    - [Method A — physical volume control and an SPL meter](#method-a--physical-volume-control-and-an-spl-meter)
+    - [Method B — Roon's digital volume, calibrated once](#method-b--roons-digital-volume-calibrated-once)
+    - [How precise do you need to be?](#how-precise-do-you-need-to-be)
+5.  [Why five bands](#why-five-bands)
+6.  [Using the web app](#using-the-web-app)
+    - ["Hear it" is a toy, not an instrument](#hear-it-is-a-toy-not-an-instrument)
+7.  [Importing into REW, Roon and other DSPs](#importing-into-rew-roon-and-other-dsps)
+    - [Pre-generated filters (no Python required)](#pre-generated-filters-no-python-required)
+    - [Loading into REW](#loading-into-rew)
+    - [Applying the headroom adjustment](#applying-the-headroom-adjustment)
+    - [Gain limits on real hardware](#gain-limits-on-real-hardware)
+    - [Recordings mastered quietly](#recordings-mastered-quietly)
+8.  [Generated Presets](#generated-presets)
+    - [Quiet — 65 dB](#quiet--65-db)
+    - [Moderate — 75 dB](#moderate--75-db)
+    - [Loud — 85 dB](#loud--85-db)
+9.  [The Math Behind It](#the-math-behind-it)
+    - [Relationship to the standard](#relationship-to-the-standard)
+    - [ISO 226 equal-loudness contours](#iso-226-equal-loudness-contours)
+    - [The compensation target](#the-compensation-target)
+    - [Fitting](#fitting)
+    - [Designed at 44.1 kHz](#designed-at-441-khz)
+    - [Where the standard stops, and what we do past it](#where-the-standard-stops-and-what-we-do-past-it)
+10. [Honest limitations](#honest-limitations)
+11. [License and third-party content](#license-and-third-party-content)
+12. [References](#references)
+
+**Just want the filters?** Skip to
+[Pre-generated filters](#pre-generated-filters-no-python-required) — no Python
+and no copy of the standard required — or open
+[the web app](#using-the-web-app) and move the slider to your listening level.
+
+---
+
 ## Introduction & Context
 
 Human hearing is not equally sensitive at all frequencies, and the shape of that
