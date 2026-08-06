@@ -261,6 +261,25 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     still sum to the response's; shifting each band by the whole preamp would
     not. A refused level has no published headroom, so it is drawn against the
     headroom it *would* need, which is the reason it was refused.
+  - **The type floor is 14px (`text-sm`); running prose is 16px
+    (`text-base`).** The audience is listeners, not developers — the owner puts
+    the median age nearer 60 than 30 — and the 10–11px captions this page
+    shipped with were legible only by leaning in. The plot's legend was missed
+    entirely for that reason, and read as unlabelled traces. `text-xs` and
+    `text-[10px]`/`text-[11px]` are therefore absent from `ui/src`; the rule is
+    written down at the top of `src/index.css`. The exception is text inside
+    the plot's `<svg>`, sized in viewBox units, which scales with the figure
+    and not with the type scale — it is still 10–11 units and does shrink on a
+    narrow window.
+  - **The page's closing block is a summary; the README is the document.** The
+    footer carries the four-step workflow and three short notes, in two
+    columns, and links the rest to `README.md#using-the-web-app`. It was four
+    dense paragraphs, which at readable type became a wall of text. New
+    explanation belongs in that README section, not appended here — a listener
+    opens this page to get a filter set out of it, not to read about it. The
+    masthead line reads the same way: it says what the filters *do*, in the
+    reader's terms, rather than reciting the edition and the band count, which
+    are already in the legend, the metrics and the footer.
 
 - **`tests/test_api.py`** — the HTTP service, through Flask's test client: no
   server, no port, no gunicorn, 0.3 s for the file. Flask is deliberately absent

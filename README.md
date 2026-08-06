@@ -66,6 +66,11 @@ This project uses **option 2** and prints the exact attenuation to apply.
 [tables](PEQ) into Roon, or load the [YAML](REW) into REW or CamillaDSP. Skip to
 [Importing into REW, Roon and other DSPs](#importing-into-rew-roon-and-other-dsps).
 
+**Or use the web app.** The same ladder as one page with a listening level
+slider, the response redrawing as you move it, and the filters ready to copy in
+five formats — no install, no Python, and nothing computed in the browser. See
+[Using the web app](#using-the-web-app).
+
 **To run the generator yourself:** Python, plus your own copy of ISO 226:2023.
 The coefficient table the maths is built on belongs to ISO and is not
 redistributable, so it is not in this repository and the code will not run
@@ -280,6 +285,41 @@ levels.
 
 ---
 
+## Using the web app
+
+[ui](ui) is this whole ladder as one page: a listening level slider, the
+response and the residual error redrawing as you move it, and the filters ready
+to copy in five formats. It computes nothing — every curve and number on it was
+produced by the generator and shipped alongside the page — so it is static, needs
+no server, and keeps working with the network off once loaded. Building and
+serving it is in [CONTRIBUTING.md](CONTRIBUTING.md#the-browser-page).
+
+The workflow it is built around:
+
+1. **Measure your average listening level for one listening scenario** — late at
+   night, background music over dinner, sitting down to listen properly. An SPL
+   meter app set to **C-weighted, slow** is enough; see
+   [How to work out your `--level`](#how-to-work-out-your---level--and-why-it-is-easier-than-it-looks).
+2. **Move the slider to that level.** Set the mastering reference too if you
+   have reason to think the recording was not mastered near 83 dB.
+3. **Enter the headroom adjustment and the five filters into your player** —
+   Roon, CamillaDSP, Equalizer APO, a hardware DSP — or copy a ready-made
+   config from the export panel.
+4. **Enable the filter and play music at that level.** The correction is only
+   the right correction at the level it was fitted for.
+
+Then repeat for your other scenarios. **Two or three presets cover most
+listening.** The ladder runs in 3 dB steps and snapping to the nearer rung costs
+at most about 0.8 dB, comfortably inside the uncertainty of the measurement
+itself, so there is no need for a preset per decibel. Roon will hold an
+unlimited number of saved PEQ sets per zone; less flexible software usually
+holds a few, which is enough.
+
+The page is built for a desktop or tablet screen. It works on a phone, but the
+filter table needs a horizontal scroll in portrait orientation.
+
+---
+
 ## Importing into REW, Roon and other DSPs
 
 ### Pre-generated filters (no Python required)
@@ -288,13 +328,8 @@ These need neither Python nor a copy of the standard. Every preset for an 83 dB
 mastering reference ships in two forms: a **table** in [PEQ](PEQ) to read and
 type in by hand, and a **CamillaDSP YAML** file in [REW](REW) to load.
 
-There is also an **interactive version** in [ui](ui): one page with a listening
-level slider, the response and the residual error redrawing as you move it, and
-the same filters ready to copy in five formats. It serves exactly the values
-below — the curves it draws were computed by the code that produced the tables
-and shipped alongside them, not recalculated in the browser — and it is a
-static page, so it needs no server. Building it is in
-[CONTRIBUTING.md](CONTRIBUTING.md#the-browser-page).
+There is also an **interactive version** in [ui](ui), which serves exactly the
+values below from a single page — see [Using the web app](#using-the-web-app).
 
 | Preset | Listening level | Relative to reference |
 | :--- | :--- | :--- |

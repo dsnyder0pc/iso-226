@@ -1,6 +1,5 @@
 import { Activity, Volume2, VolumeX } from 'lucide-react';
 
-import { meta } from '../data';
 import { ShareButton } from './ShareButton';
 
 interface Props {
@@ -28,19 +27,23 @@ export function Header({
             <Activity className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
+            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Equal-Loudness <span className="text-accent">Compensation EQ</span>
             </h1>
-            <p className="mt-0.5 text-xs text-slate-400">
-              {meta.isoEdition} · {meta.bandCount} bands · precomputed, served as a
-              static page
+            {/* What the page is for, in the reader's terms. The standard, the
+                band count and the fact that this is a static page are all still
+                on the page — in the legend, the metrics and the footer — where
+                someone who cares will look for them. */}
+            <p className="mt-0.5 text-sm text-slate-400">
+              Compensates for the natural loss of hearing sensitivity to bass and
+              treble at lower listening levels
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           {playing && sampleRate && (
-            <span className="font-mono text-[11px] text-slate-500">
+            <span className="font-mono text-sm text-slate-400">
               preview at {(sampleRate / 1000).toFixed(1)} kHz
             </span>
           )}
@@ -48,7 +51,7 @@ export function Header({
             type="button"
             onClick={onTogglePreview}
             disabled={!canPreview}
-            className={`flex items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`flex items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               playing
                 ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
                 : 'border-slate-800 bg-panel text-slate-300 hover:bg-slate-800/60 hover:text-white'

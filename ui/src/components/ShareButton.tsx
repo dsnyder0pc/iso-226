@@ -67,7 +67,7 @@ export function ShareButton({ url, title }: Props) {
       <span
         role="status"
         aria-live="polite"
-        className={`pointer-events-none absolute top-full right-0 mt-1.5 rounded-lg border border-slate-700 bg-ink px-2 py-1 text-[11px] whitespace-nowrap text-slate-300 transition-opacity ${
+        className={`pointer-events-none absolute top-full right-0 mt-1.5 rounded-lg border border-slate-700 bg-ink px-2.5 py-1 text-sm whitespace-nowrap text-slate-300 transition-opacity ${
           outcome === 'idle' ? 'opacity-0' : 'opacity-100'
         }`}
       >

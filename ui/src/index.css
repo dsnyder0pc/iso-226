@@ -9,6 +9,14 @@
   --color-target: #94a3b8;
 }
 
+/* Nothing on this page is set below `text-sm` (14px), and running prose is
+   `text-base` (16px). The audience for equal-loudness compensation is
+   listeners, not developers — median age nearer 60 than 30 — and the caption
+   sizes this page started with (10-11px) were legible only by leaning in.
+   14px is the floor a search results page uses; treat it as the floor here.
+   The one exception is text inside the plot's SVG, which is sized in viewBox
+   units and scales with the figure rather than with the type scale. */
+
 html {
   color-scheme: dark;
 }

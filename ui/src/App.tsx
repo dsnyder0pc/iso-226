@@ -129,7 +129,7 @@ export default function App() {
         )}
 
         {data.kind === 'unknown' && (
-          <section className="rounded-3xl border border-slate-800 bg-panel p-6 text-sm text-slate-400">
+          <section className="rounded-3xl border border-slate-800 bg-panel p-6 text-base text-slate-400">
             Nothing was fitted for an offset of {formatOffset(offset)}. The grid
             covers {formatOffset(meta.fitted.min)} to {formatOffset(meta.fitted.max)}.
           </section>
@@ -144,8 +144,8 @@ export default function App() {
 function NoCorrectionNeeded() {
   return (
     <section className="rounded-3xl border border-slate-800 bg-panel p-6">
-      <h2 className="text-lg font-semibold text-white">No compensation needed</h2>
-      <p className="mt-2 text-sm leading-relaxed text-slate-400">
+      <h2 className="text-xl font-semibold text-white">No compensation needed</h2>
+      <p className="mt-2 text-base leading-relaxed text-slate-400">
         You are listening at the level this recording was mastered for, so the
         ideal correction is 0.00 dB at every frequency.{' '}
         <strong className="text-slate-200">Apply no filters and no headroom
@@ -158,42 +158,97 @@ function NoCorrectionNeeded() {
   );
 }
 
-/** Opens in a new tab: leaving mid-comparison should not cost the level on screen. */
-function RepoLink({ children }: { children: ReactNode }) {
+/**
+ * Opens in a new tab: leaving mid-comparison should not cost the level on
+ * screen. `hash` addresses a section of the README, which GitHub renders at the
+ * repository root.
+ */
+function RepoLink({ children, hash }: { children: ReactNode; hash?: string }) {
   return (
     <a
-      href={REPO_URL}
+      href={hash ? `${REPO_URL}#${hash}` : REPO_URL}
       target="_blank"
       rel="noreferrer"
-      className="text-slate-400 underline decoration-slate-600 underline-offset-2 hover:text-accent"
+      className="text-slate-300 underline decoration-slate-600 underline-offset-2 hover:text-accent"
     >
       {children}
     </a>
   );
 }
 
+function FooterHeading({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="mb-3 text-sm font-semibold tracking-widest text-slate-400 uppercase">
+      {children}
+    </h2>
+  );
+}
+
+/**
+ * The closing block: how to use the page, then what is worth knowing about the
+ * numbers on it.
+ *
+ * Two short lists rather than four paragraphs. The full version of all of this
+ * is in the README — see "Using the web app" there — and it belongs there
+ * rather than here, because a listener reads this page to get a filter set out
+ * of it, not to read about it.
+ */
 function Provenance() {
   return (
-    <footer className="rounded-3xl border border-slate-800/70 bg-panel/50 p-6 text-[11px] leading-relaxed text-slate-500">
-      <p>
-        Every curve and number on this page was computed by the same Python that
-        generates the presets in <RepoLink>the repository</RepoLink>, and shipped
-        with it. The browser adds decibels and subtracts a target; it evaluates no
-        filters and interpolates no levels. Presets exist at whole-decibel
-        offsets, so the slider steps in whole decibels.
-      </p>
-      <p className="mt-2">
-        The <RepoLink>README</RepoLink> there covers what this page does not: how
-        to measure your listening level, where the ISO 226:2023 data comes from
-        and why it is not redistributed, why five bands are enough, and why the
-        quietest levels are refused rather than approximated.
-      </p>
-      <p className="mt-2">
-        Measure the listening level broadband, C-weighted, slow. A measurement
-        convention shared by the level and the reference cancels; an error in the
-        level alone does not — 6 dB there costs about 3.15 dB of correction.
-      </p>
-      <p className="mt-2 font-mono">
+    <footer className="grid gap-x-10 gap-y-8 rounded-3xl border border-slate-800/70 bg-panel/50 p-6 text-base leading-relaxed text-slate-400 md:grid-cols-2">
+      <section>
+        <FooterHeading>How to use this page</FooterHeading>
+        <ol className="ml-5 list-decimal space-y-2">
+          <li>
+            Measure your <strong className="text-slate-300">average</strong> level
+            for one listening scenario — late at night, over dinner, sitting down
+            to listen properly. An SPL meter app set to{' '}
+            <strong className="text-slate-300">C-weighted, slow</strong> is enough.
+          </li>
+          <li>Move the slider to that level.</li>
+          <li>
+            Enter the headroom adjustment and the five filters into your player,
+            or copy a ready-made config from Export above.
+          </li>
+          <li>Enable the filter and play music at that level.</li>
+        </ol>
+        <p className="mt-3">
+          Repeat for your other scenarios. Two or three presets cover most
+          listening — the rungs are 3 dB apart, and the nearer one costs at most
+          about 0.8 dB.
+        </p>
+      </section>
+
+      <section>
+        <FooterHeading>Worth knowing</FooterHeading>
+        <ul className="ml-5 list-disc space-y-2">
+          <li>
+            The level matters more than the filters. A 6 dB error there costs
+            about 3.15 dB of correction; a measurement convention shared by the
+            level and the reference cancels.
+          </li>
+          <li>
+            Every curve and number here was computed by the Python that generates
+            the presets in <RepoLink>the repository</RepoLink> and shipped with
+            the page. The browser adds decibels and subtracts a target; it
+            evaluates no filters.
+          </li>
+          <li>
+            The README covers the rest:{' '}
+            <RepoLink hash="using-the-web-app">using this page</RepoLink>,{' '}
+            <RepoLink hash="how-to-work-out-your---level--and-why-it-is-easier-than-it-looks">
+              measuring your level
+            </RepoLink>
+            , <RepoLink hash="why-five-bands">why five bands</RepoLink>, and{' '}
+            <RepoLink hash="relationship-to-the-standard">
+              what the standard does and does not vouch for
+            </RepoLink>
+            .
+          </li>
+        </ul>
+      </section>
+
+      <p className="font-mono text-sm md:col-span-2">
         {meta.isoEdition} · presets generated {meta.generatedUtc}
       </p>
     </footer>

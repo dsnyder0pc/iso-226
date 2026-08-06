@@ -33,7 +33,7 @@ export function ResponsePlot({ data }: Props) {
   if (data.kind === 'unknown' || !paths) {
     return (
       <section className="rounded-3xl border border-slate-800 bg-panel p-6">
-        <p className="text-sm text-slate-400">
+        <p className="text-base text-slate-400">
           No preset was fitted for this offset, so there is nothing to plot.
         </p>
       </section>
@@ -46,11 +46,11 @@ export function ResponsePlot({ data }: Props) {
   return (
     <section className="rounded-3xl border border-slate-800 bg-panel p-4 shadow-xl sm:p-6">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-xs font-semibold tracking-widest text-slate-400 uppercase">
+        <h2 className="flex items-center gap-2 text-sm font-semibold tracking-widest text-slate-400 uppercase">
           <Activity className="h-4 w-4 text-accent" />
           Frequency response
         </h2>
-        <p className="font-mono text-[11px] text-slate-500">
+        <p className="font-mono text-sm text-slate-400">
           {data.kind === 'served'
             ? `preamp ${data.headroomDb.toFixed(1)} dB applied`
             : `preamp ${paths.shift.toFixed(1)} dB required`}{' '}
@@ -357,7 +357,7 @@ export function ResponsePlot({ data }: Props) {
 
 function Legend({ served }: { served: boolean }) {
   return (
-    <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-slate-400">
+    <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-400">
       <Key className="bg-target/60" label={`ISO ${meta.isoEdition.slice(4)} target`} />
       {served && <Key className="bg-accent" label="Achieved (published values)" />}
       {served && <Key className="bg-accent/30" label="Individual bands" />}
@@ -365,7 +365,7 @@ function Legend({ served }: { served: boolean }) {
       <Key className="bg-slate-400/50" label="Flat reference (the preamp)" />
       {served && <Key className="bg-emerald-400" label="Residual" />}
       {served && <Key className="bg-amber-400/60" label="± the published max residual" />}
-      <span className="text-slate-500">
+      <span className="text-slate-400">
         {publishedHz(isoBandHz.low)}–{publishedHz(isoBandHz.high)} Hz is where ISO 226 has data;
         the shaded band above it is held flat. Residual strip spans ±{RESIDUAL_BOUND} dB across the
         whole ladder and is clipped outside the ISO range.
