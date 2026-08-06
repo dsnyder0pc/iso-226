@@ -1,12 +1,14 @@
-import { Activity, Volume2, VolumeX } from 'lucide-react';
+import { Activity, ArrowLeftRight, Volume2, VolumeX } from 'lucide-react';
 
 import { ShareButton } from './ShareButton';
 
 interface Props {
   canPreview: boolean;
   playing: boolean;
+  bypassed: boolean;
   sampleRate: number | null;
   onTogglePreview: () => void;
+  onToggleBypass: () => void;
   shareUrl: string;
   shareTitle: string;
 }
@@ -14,8 +16,10 @@ interface Props {
 export function Header({
   canPreview,
   playing,
+  bypassed,
   sampleRate,
   onTogglePreview,
+  onToggleBypass,
   shareUrl,
   shareTitle,
 }: Props) {
@@ -41,16 +45,38 @@ export function Header({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* A nerd detail, and the first thing to go when the row gets tight. */}
           {playing && sampleRate && (
-            <span className="font-mono text-sm text-slate-400">
+            <span className="hidden font-mono text-sm text-slate-400 sm:inline">
               preview at {(sampleRate / 1000).toFixed(1)} kHz
             </span>
+          )}
+          {/* The comparison is the point of listening at all, so the control
+              for it appears next to the transport rather than in a panel. */}
+          {playing && (
+            <button
+              type="button"
+              onClick={onToggleBypass}
+              aria-pressed={bypassed}
+              className={`flex items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-sm font-medium transition-colors ${
+                bypassed
+                  ? 'border-amber-500/40 bg-amber-500/20 text-amber-100'
+                  : 'border-slate-800 bg-panel text-slate-300 hover:bg-slate-800/60 hover:text-white'
+              }`}
+              title="Compare against flat. The filters come out and the headroom stays, so the midrange holds still and only the tilt changes — the dotted reference line on the plot."
+            >
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              {bypassed ? 'Filters off' : 'Filters on'}
+            </button>
           )}
           <button
             type="button"
             onClick={onTogglePreview}
-            disabled={!canPreview}
+            // Stopping is always allowed. Gating this on `canPreview` alone
+            // left the button disabled at a level that cannot be previewed,
+            // with no way to silence what was already playing.
+            disabled={!canPreview && !playing}
             className={`flex items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               playing
                 ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'

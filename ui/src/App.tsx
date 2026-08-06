@@ -61,17 +61,28 @@ export default function App() {
   // Keep a running preview on the level under the cursor. Depends on the two
   // stable pieces of the hook rather than the object it returns, which is new
   // on every render.
-  const { playing, update } = preview;
+  const { playing, update, stop } = preview;
   useEffect(() => {
-    if (playing && data.kind === 'served') {
-      update(data.filters, data.headroomDb);
+    if (!playing) {
+      return;
     }
-  }, [data, playing, update]);
+    if (data.kind === 'served') {
+      update(data.filters, data.headroomDb);
+    } else {
+      // Landing on a refused level -- only reachable by typing a level or
+      // following a link, since the slider stops at the servable range -- must
+      // not leave the previous level's filters playing under a page that says
+      // no filter set is served here.
+      stop();
+    }
+  }, [data, playing, update, stop]);
 
+  // The reference rung has no filters, and is still worth hearing: it is the
+  // flat end of the comparison the bypass button makes at every other level.
   const togglePreview = () => {
     if (preview.playing) {
       preview.stop();
-    } else if (data.kind === 'served' && data.filters.length > 0) {
+    } else if (data.kind === 'served') {
       preview.start(data.filters, data.headroomDb);
     }
   };
@@ -79,10 +90,12 @@ export default function App() {
   return (
     <div className="min-h-screen pb-16 text-slate-100">
       <Header
-        canPreview={data.kind === 'served' && data.filters.length > 0}
+        canPreview={data.kind === 'served'}
         playing={preview.playing}
+        bypassed={preview.bypassed}
         sampleRate={preview.sampleRate}
         onTogglePreview={togglePreview}
+        onToggleBypass={() => preview.setBypass(!preview.bypassed)}
         shareUrl={shareUrl(
           `${window.location.origin}${window.location.pathname}`,
           { level, reference },

@@ -271,6 +271,17 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     the plot's `<svg>`, sized in viewBox units, which scales with the figure
     and not with the type scale — it is still 10–11 units and does shrink on a
     narrow window.
+  - **The preview's bypass keeps the preamp and removes only the bands.** That
+    is what makes it a comparison instead of a volume change: the compensation
+    is 0 dB at 1 kHz by definition, so the filtered midrange already sits at
+    the preamp gain, and holding it there leaves only the tilt to hear. It is
+    the same flat reference the plot draws as a dotted line. The graph
+    allocates one biquad per published band up front rather than one per
+    filter, so the slider can move between any two levels — including onto the
+    pass-through rung, which has no filters — without a rebuild. An unused
+    slot must be set to **`peaking` at 0 dB**, not merely to 0 dB: a fresh
+    `BiquadFilterNode` is a lowpass at 350 Hz, and `gain` does nothing to a
+    lowpass.
   - **The page's closing block is a summary; the README is the document.** The
     footer carries the four-step workflow and three short notes, in two
     columns, and links the rest to `README.md#using-the-web-app`. It was four
