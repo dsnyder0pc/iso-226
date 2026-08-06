@@ -239,6 +239,14 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     than fitted to the level on screen, so dragging the slider shows the
     correction growing and the residual worsening at the quiet end. 60 dB
     *looking* worse than 70 dB is the point.
+  - **The view is 20 Hz–20 kHz; the data is not.** The window matches the
+    figures in `images/` that the PEQ tables embed, so a listener comparing
+    the page against a preset's own plot sees the same picture. It crops
+    exactly at `in_band`, whose first index is 20 Hz to within 4e-15, so the
+    sub-20 Hz extrapolation block comes off whole and nothing measured is
+    touched — the residual is still computed over the optimizer's own slice.
+    What it stops showing is the sub-20 Hz overshoot described under the
+    headroom invariant below; that is deliberate and matches `images/`.
   - **The response panel adds the headroom; the residual panel must not.**
     Both traces on the upper panel are drawn with the preamp applied, against
     a 0 dBFS clipping line and a dotted flat reference, exactly as
@@ -378,6 +386,20 @@ lives in `regenerate.py` — so this applies to anything new.)
 - **Design and analyse at 44.1 kHz**, verify headroom across all `VERIFY_RATES`,
   and publish the worst case rounded *away from zero* to 0.1 dB (Roon's entry
   precision, and the one field where Roon really is limited to one decimal).
+- **The published headroom covers 20 Hz–20 kHz, not the whole design grid.**
+  `peak_gain` measures on `logspace(log10(20), log10(20000))`, while the fit
+  runs from 10 Hz. A low shelf has not reached its plateau at 20 Hz, so these
+  cascades peak *below* the range the headroom is measured over: 23 of the 31
+  servable presets exceed 0 dBFS somewhere in 10–20 Hz, worst +0.75 dB at
+  83→63 dB, and identical at all four rates because warping is a Nyquist
+  effect. The bound is the low shelf's own gain, itself capped at 12 dB.
+  **This is known and accepted, not an oversight** — content below 20 Hz is
+  rare and inaudible, and the owner has judged it not worth the cost. That
+  cost is the reason to think before "fixing" it: measuring from
+  `EXTRAP_LOW_HZ` makes 23 presets 0.1–0.8 dB more negative, which rewrites
+  every table, config, figure and README value, and pushes 60 dB over the
+  12 dB budget so the documented floor moves to 61 dB. The filters themselves
+  would not change.
 - **Out-of-band regions are constrained, not optimized.** Keep the target
   flat-held below 20 Hz and above 12.5 kHz with `EXTRAP_TOLERANCE_DB`; this is
   what keeps subsonic gain bounded.

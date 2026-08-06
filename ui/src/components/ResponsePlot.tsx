@@ -24,7 +24,6 @@ interface Props {
   data: LevelData;
 }
 
-const HELD_LOW_X = xOf(isoBandHz.low);
 const HELD_HIGH_X = xOf(isoBandHz.high);
 
 export function ResponsePlot({ data }: Props) {
@@ -91,15 +90,10 @@ export function ResponsePlot({ data }: Props) {
             </clipPath>
           </defs>
 
-          {/* Regions where ISO has no data and the target is held flat. The
-              filters are constrained there, never optimized there. */}
-          <rect
-            x={panels.left}
-            y={panels.main.top}
-            width={HELD_LOW_X - panels.left}
-            height={panels.residual.bottom - panels.main.top}
-            className="fill-slate-100/[0.035]"
-          />
+          {/* Above 12.5 kHz ISO has no data and the target is held flat; the
+              filters are constrained there, never optimized there. The view
+              starts at 20 Hz, so the matching region at the bottom is off the
+              left edge rather than shaded. */}
           <rect
             x={HELD_HIGH_X}
             y={panels.main.top}
@@ -289,15 +283,6 @@ export function ResponsePlot({ data }: Props) {
             Residual — published set against the ISO target
           </text>
           <text
-            x={HELD_LOW_X + 4}
-            y={panels.main.top + 14}
-            className="fill-slate-500 text-[10px]"
-            textAnchor="end"
-            transform={`rotate(-90 ${HELD_LOW_X + 4} ${panels.main.top + 14})`}
-          >
-            held flat
-          </text>
-          <text
             x={HELD_HIGH_X + 14}
             y={panels.main.top + 14}
             className="fill-slate-500 text-[10px]"
@@ -381,9 +366,9 @@ function Legend({ served }: { served: boolean }) {
       {served && <Key className="bg-emerald-400" label="Residual" />}
       {served && <Key className="bg-amber-400/60" label="± the published max residual" />}
       <span className="text-slate-500">
-        Shaded: outside ISO data ({publishedHz(isoBandHz.low)}–{publishedHz(isoBandHz.high)} Hz),
-        target held flat. Residual strip spans ±{RESIDUAL_BOUND} dB across the whole ladder and is
-        clipped outside the ISO range.
+        {publishedHz(isoBandHz.low)}–{publishedHz(isoBandHz.high)} Hz is where ISO 226 has data;
+        the shaded band above it is held flat. Residual strip spans ±{RESIDUAL_BOUND} dB across the
+        whole ladder and is clipped outside the ISO range.
       </span>
     </dl>
   );

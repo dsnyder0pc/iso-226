@@ -45,7 +45,26 @@ const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
 const MAIN_TOP = MARGIN.top;
 const RESIDUAL_TOP = MARGIN.top + MAIN_HEIGHT + GAP;
 
-const first = meta.gridHz[0] ?? 10;
+/**
+ * The window is 20 Hz-20 kHz, matching the figures in `images/` that the PEQ
+ * tables embed — a listener comparing the page against a preset's own plot
+ * should be looking at the same picture.
+ *
+ * The data still runs from 10 Hz, because the optimizer's grid does and the
+ * residual has to be measured over the slice the objective used. This crops
+ * the *view*, and it crops it exactly at `in_band`, whose first index is
+ * 20 Hz to within 4e-15 — so the sub-20 Hz extrapolation block comes off
+ * whole and nothing in-band is touched.
+ *
+ * What this deliberately stops showing: the cascade's true peak lies between
+ * 10 and 20 Hz, where a low shelf is still climbing to its plateau, and
+ * `peak_gain` in iso226_utils.py does not look there either. Up to 0.75 dB of
+ * the response therefore sits above 0 dBFS off the left edge of this view.
+ * The published figures have always cropped it the same way.
+ */
+const VISIBLE_FROM = meta.inBand[0];
+
+const first = meta.gridHz[VISIBLE_FROM] ?? 20;
 const last = meta.gridHz[meta.gridHz.length - 1] ?? 20000;
 const LOG_MIN = Math.log10(first);
 const LOG_MAX = Math.log10(last);
@@ -66,12 +85,13 @@ function extremes(): { gain: [number, number]; residual: number } {
       continue;
     }
     const shift = displayShift(data);
-    for (const db of data.target) {
+    // Only what is on screen sets the scale.
+    for (const db of data.target.slice(VISIBLE_FROM)) {
       low = Math.min(low, db + shift);
       high = Math.max(high, db + shift);
     }
     if (data.kind === 'served') {
-      for (const db of data.response) {
+      for (const db of data.response.slice(VISIBLE_FROM)) {
         low = Math.min(low, db + shift);
         high = Math.max(high, db + shift);
       }
@@ -135,7 +155,6 @@ export const panels = {
 
 /** ISO 266 preferred frequencies, labelled where there is room for a label. */
 export const FREQUENCY_TICKS: { hz: number; label: string | null }[] = [
-  { hz: 10, label: '10' },
   { hz: 20, label: '20' },
   { hz: 50, label: '50' },
   { hz: 100, label: '100' },
@@ -173,12 +192,12 @@ export function residualTicks(): number[] {
  */
 export function pathOf(values: number[], yOf: (db: number) => number): string {
   let d = '';
-  values.forEach((db, i) => {
-    const hz = meta.gridHz[i];
+  values.slice(VISIBLE_FROM).forEach((db, offset) => {
+    const hz = meta.gridHz[VISIBLE_FROM + offset];
     if (hz === undefined) {
       return;
     }
-    d += `${i === 0 ? 'M' : 'L'}${xOf(hz).toFixed(2)} ${yOf(db).toFixed(2)}`;
+    d += `${offset === 0 ? 'M' : 'L'}${xOf(hz).toFixed(2)} ${yOf(db).toFixed(2)}`;
   });
   return d;
 }
@@ -233,11 +252,14 @@ export function pathsFor(offset: number): Paths | null {
   return built;
 }
 
-/** The nearest grid index to a frequency, for the hover readout. */
+/** The nearest *visible* grid index to a frequency, for the hover readout. */
 export function nearestIndex(hz: number): number {
-  let best = 0;
+  let best = VISIBLE_FROM;
   let bestGap = Infinity;
   meta.gridHz.forEach((point, i) => {
+    if (i < VISIBLE_FROM) {
+      return;
+    }
     const gap = Math.abs(Math.log10(point) - Math.log10(hz));
     if (gap < bestGap) {
       bestGap = gap;
