@@ -116,12 +116,19 @@ export default function App() {
           }}
         />
 
-        <ResponsePlot data={data} />
+        {/* The plot is told what is audible, not which buttons are pressed:
+            "bypassed" only means anything while something is playing. */}
+        <ResponsePlot
+          data={data}
+          hearing={
+            !preview.playing ? null : preview.bypassed ? 'flat' : 'compensated'
+          }
+        />
 
         {data.kind === 'served' && data.filters.length > 0 && (
           <>
             <MetricsPanel data={data} level={level} reference={reference} />
-            <FilterTable filters={data.filters} />
+            <FilterTable filters={data.filters} headroomDb={data.headroomDb} />
             <ExportPanel
               context={{
                 data,

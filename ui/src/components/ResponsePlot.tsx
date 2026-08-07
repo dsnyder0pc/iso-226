@@ -20,13 +20,22 @@ import {
 } from '../plot/geometry';
 import { publishedHz } from '../format';
 
+/**
+ * What the preview is putting through the speakers, or null when it is not
+ * running. One tri-state rather than a `playing`/`bypassed` pair, which can
+ * express a combination that does not exist (bypassed while stopped) and would
+ * leave this component deciding what that meant.
+ */
+export type Hearing = 'compensated' | 'flat' | null;
+
 interface Props {
   data: LevelData;
+  hearing: Hearing;
 }
 
 const HELD_HIGH_X = xOf(isoBandHz.high);
 
-export function ResponsePlot({ data }: Props) {
+export function ResponsePlot({ data, hearing }: Props) {
   const [hover, setHover] = useState<number | null>(null);
   const paths = useMemo(() => pathsFor(data.offset), [data.offset]);
 
@@ -42,6 +51,12 @@ export function ResponsePlot({ data }: Props) {
 
   const served = data.kind === 'served' ? data : null;
   const readout = hover === null ? null : readoutAt(data, hover, paths.shift);
+  // Bypass takes the bands out and keeps the preamp, so what is audible then is
+  // exactly the flat reference this plot already drew as a dotted line. Until
+  // this prop existed the two were unconnected, and a reviewer toggling the
+  // button heard the sound change while the picture sat still -- and concluded
+  // he had misunderstood the page rather than that it had told him nothing.
+  const flatIsLive = hearing === 'flat';
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-panel p-4 shadow-xl sm:p-6">
@@ -50,12 +65,32 @@ export function ResponsePlot({ data }: Props) {
           <Activity className="h-4 w-4 text-accent" />
           Frequency response
         </h2>
-        <p className="font-mono text-sm text-slate-400">
-          {data.kind === 'served'
-            ? `preamp ${data.headroomDb.toFixed(1)} dB applied`
-            : `preamp ${paths.shift.toFixed(1)} dB required`}{' '}
-          · evaluated at {(meta.designFs / 1000).toFixed(1)} kHz
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Only while the preview runs: on a silent page there is nothing
+              being heard, and a chip claiming otherwise would be furniture. */}
+          {hearing !== null && (
+            <span
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
+                flatIsLive
+                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-100'
+                  : 'border-accent/40 bg-accent/15 text-accent'
+              }`}
+            >
+              <span
+                className={`inline-block h-0.5 w-4 rounded-full ${
+                  flatIsLive ? 'bg-slate-300' : 'bg-accent'
+                }`}
+              />
+              Hearing {flatIsLive ? 'flat — filters off' : 'the compensated response'}
+            </span>
+          )}
+          <p className="font-mono text-sm text-slate-400">
+            {data.kind === 'served'
+              ? `preamp ${data.headroomDb.toFixed(1)} dB applied`
+              : `preamp ${paths.shift.toFixed(1)} dB required`}{' '}
+            · evaluated at {(meta.designFs / 1000).toFixed(1)} kHz
+          </p>
+        </div>
       </header>
 
       <div className="rounded-2xl border border-slate-800 bg-ink p-1 sm:p-2">
@@ -67,7 +102,7 @@ export function ResponsePlot({ data }: Props) {
           // ones still reach the crosshair.
           className="w-full touch-pan-y"
           role="img"
-          aria-label={describe(data)}
+          aria-label={describe(data, hearing)}
           onPointerMove={(event) => {
             const box = event.currentTarget.getBoundingClientRect();
             const x = ((event.clientX - box.left) / box.width) * WIDTH;
@@ -174,24 +209,27 @@ export function ResponsePlot({ data }: Props) {
             0 dBFS — clipping
           </text>
 
-          {/* Where a band contributing nothing lands: the preamp itself. */}
+          {/* Where a band contributing nothing lands: the preamp itself, and
+              so also what the bypass leaves audible. It becomes the solid
+              trace while that is what is playing. */}
           <line
             x1={panels.left}
             y1={yOfGain(paths.shift)}
             x2={panels.right}
             y2={yOfGain(paths.shift)}
-            className="stroke-slate-400/50"
-            strokeWidth={1}
-            strokeDasharray="2 4"
+            className={flatIsLive ? 'stroke-slate-200' : 'stroke-slate-400/50'}
+            strokeWidth={flatIsLive ? 2.5 : 1}
+            strokeDasharray={flatIsLive ? undefined : '2 4'}
           />
 
-          {/* Individual bands, behind everything they sum to. */}
+          {/* Individual bands, behind everything they sum to. Out of circuit
+              under bypass, so they fade with the sum they belong to. */}
           {paths.bands.map((d, i) => (
             <path
               key={i}
               d={d}
               fill="none"
-              className="stroke-accent/25"
+              className={flatIsLive ? 'stroke-accent/10' : 'stroke-accent/25'}
               strokeWidth={1.25}
             />
           ))}
@@ -211,6 +249,11 @@ export function ResponsePlot({ data }: Props) {
               className="stroke-accent"
               strokeWidth={2.25}
               strokeLinejoin="round"
+              // Ghosted rather than hidden under bypass: the comparison is the
+              // point, and a trace that vanished would read as the filters
+              // having been unloaded rather than switched out of circuit.
+              opacity={flatIsLive ? 0.3 : 1}
+              strokeDasharray={flatIsLive ? '5 4' : undefined}
             />
           )}
 
@@ -350,19 +393,29 @@ export function ResponsePlot({ data }: Props) {
         </svg>
       </div>
 
-      <Legend served={served !== null} />
+      <Legend served={served !== null} flatIsLive={flatIsLive} />
     </section>
   );
 }
 
-function Legend({ served }: { served: boolean }) {
+function Legend({ served, flatIsLive }: { served: boolean; flatIsLive: boolean }) {
   return (
     <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-400">
       <Key className="bg-target/60" label={`ISO ${meta.isoEdition.slice(4)} target`} />
-      {served && <Key className="bg-accent" label="Achieved (published values)" />}
+      {served && (
+        <Key
+          className="bg-accent"
+          label={flatIsLive ? 'Achieved (switched out)' : 'Achieved (published values)'}
+        />
+      )}
       {served && <Key className="bg-accent/30" label="Individual bands" />}
       <Key className="bg-rose-400/70" label="0 dBFS" />
-      <Key className="bg-slate-400/50" label="Flat reference (the preamp)" />
+      <Key
+        className={flatIsLive ? 'bg-slate-200' : 'bg-slate-400/50'}
+        label={
+          flatIsLive ? 'Flat reference (playing now)' : 'Flat reference (the preamp)'
+        }
+      />
       {served && <Key className="bg-emerald-400" label="Residual" />}
       {served && <Key className="bg-amber-400/60" label="± the published max residual" />}
       <span className="text-slate-400">
@@ -412,14 +465,25 @@ function readoutAt(data: LevelData, index: number, shift: number): Readout | nul
   };
 }
 
-function describe(data: LevelData): string {
+function describe(data: LevelData, hearing: Hearing): string {
   const sign = data.offset >= 0 ? '+' : '';
+  // The bypass state is announced too: a screen reader user toggling it has
+  // even less to go on than a sighted one, who at least sees the trace fade.
+  const audible =
+    hearing === null
+      ? ''
+      : hearing === 'flat'
+        ? ' The preview is bypassed, so the flat reference is what is playing.'
+        : ' The preview is playing this compensated response.';
   if (data.kind !== 'served') {
-    return `Compensation target for a ${sign}${data.offset} dB offset. No filter set is served at this level.`;
+    return (
+      `Compensation target for a ${sign}${data.offset} dB offset. ` +
+      `No filter set is served at this level.${audible}`
+    );
   }
   return (
     `Compensation for a ${sign}${data.offset} dB offset: ${data.filters.length} bands ` +
     `matching the ISO target to within ${data.maxResidualDb} dB between ` +
-    `${publishedHz(isoBandHz.low)} and ${publishedHz(isoBandHz.high)} Hz.`
+    `${publishedHz(isoBandHz.low)} and ${publishedHz(isoBandHz.high)} Hz.${audible}`
   );
 }
