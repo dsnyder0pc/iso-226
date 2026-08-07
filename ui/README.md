@@ -53,6 +53,21 @@ same log axis the plot uses, so the tab shows a small version of what the page
 draws. It is frozen artwork rather than a generated artifact — no test ties it
 to the data, and it only has to be recognisably that shape.
 
+Where that shape came from is recorded, not just asserted.
+`scripts/trace_favicon_path.py` derives the path from `web/curves.json` and
+reproduces the committed one exactly, including the two adjustments made by
+eye, which it applies rather than describes:
+
+```bash
+python3 scripts/trace_favicon_path.py           # print the path
+python3 scripts/trace_favicon_path.py --check   # diff it against favicon.svg
+```
+
+It is a provenance record with a date on it, not part of any build — nothing
+runs it, and `--check` failing means the artwork was edited, which is allowed.
+The geometry is ISO 226:2023 contour data mapped into a 64-unit box; there is
+no step in it where a shape was borrowed from anywhere.
+
 The other two are rasterized from it, and are worth regenerating together if it
 ever changes:
 
