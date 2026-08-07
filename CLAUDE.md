@@ -282,6 +282,17 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     slot must be set to **`peaking` at 0 dB**, not merely to 0 dB: a fresh
     `BiquadFilterNode` is a lowpass at 350 Hz, and `gain` does nothing to a
     lowpass.
+  - **Nothing above the figure may depend on the preview state.** The "Hearing
+    …" chip lives among the plot's legend keys, below the `<svg>`, and it
+    belongs there for layout rather than taste: in the plot's *header* it grew
+    that row from 20px to 30px when the preview started — a `text-sm` row
+    against a `px-3 py-1` pill — so the plot dropped 10px out from under the
+    pointer, and at narrow widths the row wrapped instead and the drop became a
+    whole line. Below the figure the row can appear, disappear and rewrap for
+    free. It reads as one more key anyway, since it names a trace drawn beside
+    it. The page header has the same shape of problem and still has it: it
+    gains the bypass button while playing, and being `sticky`, a wrap there
+    moves the whole page.
   - **The page's closing block is a summary; the README is the document.** The
     footer carries the four-step workflow and three short notes, in two
     columns, and links the rest to `README.md#using-the-web-app`. It was four

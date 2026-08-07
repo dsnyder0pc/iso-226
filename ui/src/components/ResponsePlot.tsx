@@ -60,37 +60,23 @@ export function ResponsePlot({ data, hearing }: Props) {
 
   return (
     <section className="rounded-3xl border border-slate-800 bg-panel p-4 shadow-xl sm:p-6">
+      {/* Nothing in this row may depend on `hearing`. Everything above the
+          figure is layout the plot's position rests on, and a chip that
+          appeared here when the preview started grew the row by 10px on a wide
+          window and by a wrapped line on a narrow one -- so starting the
+          preview moved the plot out from under the pointer. The state is
+          announced under the figure instead, where the row can grow freely. */}
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold tracking-widest text-slate-400 uppercase">
           <Activity className="h-4 w-4 text-accent" />
           Frequency response
         </h2>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Only while the preview runs: on a silent page there is nothing
-              being heard, and a chip claiming otherwise would be furniture. */}
-          {hearing !== null && (
-            <span
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
-                flatIsLive
-                  ? 'border-amber-500/40 bg-amber-500/15 text-amber-100'
-                  : 'border-accent/40 bg-accent/15 text-accent'
-              }`}
-            >
-              <span
-                className={`inline-block h-0.5 w-4 rounded-full ${
-                  flatIsLive ? 'bg-slate-300' : 'bg-accent'
-                }`}
-              />
-              Hearing {flatIsLive ? 'flat — filters off' : 'the compensated response'}
-            </span>
-          )}
-          <p className="font-mono text-sm text-slate-400">
-            {data.kind === 'served'
-              ? `preamp ${data.headroomDb.toFixed(1)} dB applied`
-              : `preamp ${paths.shift.toFixed(1)} dB required`}{' '}
-            · evaluated at {(meta.designFs / 1000).toFixed(1)} kHz
-          </p>
-        </div>
+        <p className="font-mono text-sm text-slate-400">
+          {data.kind === 'served'
+            ? `preamp ${data.headroomDb.toFixed(1)} dB applied`
+            : `preamp ${paths.shift.toFixed(1)} dB required`}{' '}
+          · evaluated at {(meta.designFs / 1000).toFixed(1)} kHz
+        </p>
       </header>
 
       <div className="rounded-2xl border border-slate-800 bg-ink p-1 sm:p-2">
@@ -393,14 +379,37 @@ export function ResponsePlot({ data, hearing }: Props) {
         </svg>
       </div>
 
-      <Legend served={served !== null} flatIsLive={flatIsLive} />
+      <Legend served={served !== null} hearing={hearing} />
     </section>
   );
 }
 
-function Legend({ served, flatIsLive }: { served: boolean; flatIsLive: boolean }) {
+function Legend({ served, hearing }: { served: boolean; hearing: Hearing }) {
+  const flatIsLive = hearing === 'flat';
   return (
     <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-400">
+      {/* What is playing belongs among the keys: it names one of the traces
+          beside it, and it is the one drawn solid while it is playing. Only
+          while the preview runs -- on a silent page there is nothing being
+          heard, and a chip claiming otherwise would be furniture. Everything
+          in this row is below the figure, so it may appear, disappear and
+          rewrap without moving the plot. */}
+      {hearing !== null && (
+        <span
+          className={`flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium ${
+            flatIsLive
+              ? 'border-amber-500/40 bg-amber-500/15 text-amber-100'
+              : 'border-accent/40 bg-accent/15 text-accent'
+          }`}
+        >
+          <span
+            className={`inline-block h-0.5 w-5 rounded-full ${
+              flatIsLive ? 'bg-slate-300' : 'bg-accent'
+            }`}
+          />
+          Hearing {flatIsLive ? 'flat — filters off' : 'the compensated response'}
+        </span>
+      )}
       <Key className="bg-target/60" label={`ISO ${meta.isoEdition.slice(4)} target`} />
       {served && (
         <Key
