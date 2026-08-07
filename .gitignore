@@ -141,6 +141,12 @@ cython_debug/
 .DS_Store
 Thumbs.db
 
+# Editor and agent state. settings.local.json is one machine's accumulated
+# permission allowlist -- a property of whoever ran the tool, not of the
+# project. The unsuffixed settings.json is the shared one by convention, so it
+# is deliberately not matched here and would be tracked if it ever appeared.
+.claude/settings.local.json
+
 # Equal-Loudness compensation PEQ generated files.
 # Anchored to the repo root with a leading slash, so the curated copies under
 # images/ and REW/ stay tracked without needing negations.
