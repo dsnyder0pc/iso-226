@@ -24,15 +24,15 @@ development entry: it points at `/src/main.tsx`, which no browser can execute,
 so serving this directory gets you a blank page and a 404 for a TypeScript
 file. Only `npm run build` produces something servable.
 
-`dist/` is a plain `index.html` plus one JavaScript and one CSS file, about
-500 KB in total. Copy it anywhere that serves static files:
+`dist/` is a plain `index.html`, one JavaScript file, one CSS file and the
+three icons, about 550 KB in total. Copy it anywhere that serves static files:
 
 ```bash
 rsync -a --delete dist/ user@host:/var/www/iso226-ui/
 ```
 
-The trailing slash on `dist/` puts those three files at the target root rather
-than in a `dist` subdirectory. Nothing else belongs on the server — not
+The trailing slash on `dist/` puts those files at the target root rather than
+in a `dist` subdirectory. Nothing else belongs on the server — not
 `node_modules` (142 MB), not `src/`, not this file.
 
 An nginx `root` pointing at that directory is the entire server configuration.
@@ -43,6 +43,31 @@ It does **not** work from a `file://` path — browsers refuse to load ES module
 scripts from a null origin, so the page comes up blank. Any static server will
 do instead, including `npm run preview` or `python -m http.server --directory
 dist`. (Verified, not assumed: the file:// attempt renders an empty document.)
+
+## The icon
+
+`public/` holds the favicon, and Vite copies it to the root of `dist/`
+untouched. `favicon.svg` is the source and the only file worth editing: the
+mark is the compensation target itself, traced from the 83 → 65 dB curve on the
+same log axis the plot uses, so the tab shows a small version of what the page
+draws. It is frozen artwork rather than a generated artifact — no test ties it
+to the data, and it only has to be recognisably that shape.
+
+The other two are rasterized from it, and are worth regenerating together if it
+ever changes:
+
+```bash
+for s in 16 32 48; do rsvg-convert -w $s -h $s public/favicon.svg -o /tmp/ico-$s.png; done
+magick /tmp/ico-16.png /tmp/ico-32.png /tmp/ico-48.png public/favicon.ico
+magick -background '#0f1424' -density 384 public/favicon.svg \
+    -resize 180x180 -flatten -depth 8 -strip public/apple-touch-icon.png
+```
+
+The `.ico` carries all three sizes because Windows and older browsers pick from
+it by size. The touch icon is flattened onto the tile's own colour rather than
+kept transparent: iOS applies its own corner mask, and a transparent corner
+under that mask shows as a black notch. Flattening leaves the accent rim
+visible and lets the mask do the rounding.
 
 ## Links
 

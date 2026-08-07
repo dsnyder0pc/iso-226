@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Equal-loudness compensation curve">
+  <title>Equal-Loudness Compensation EQ</title>
+  <!--
+    The mark is the compensation target itself: steep bass boost on the left,
+    through 0 dB near 1 kHz, back up at the top of the band. The path was
+    traced from the 83 to 65 dB target in web/curves.json on a log frequency
+    axis spanning 20 Hz to 20 kHz, the same window the plot and images/ show,
+    then sampled to ten anchors and smoothed. It is hand-frozen artwork, not a
+    generated artifact: nothing regenerates it and no test holds it to the
+    data. It only has to be recognisably the shape the page draws.
+
+    Tile and stroke are the header badge's colours: the accent token #818cf8
+    on ink. The hairline border is load-bearing at 16 px: without it the tile
+    dissolves into a dark browser tab strip and the curve reads as floating.
+  -->
+  <rect width="64" height="64" rx="14" fill="#0f1424"/>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#818cf8" stroke-width="2"/>
+  <path
+    d="M 10.0 15.6 C 10.8 16.5 13.3 19.0 15.0 21.0 C 16.6 22.9 18.3 25.1 19.9 27.2 C 21.5 29.2 23.0 31.4 24.6 33.5 C 26.2 35.6 27.9 38.0 29.5 39.7 C 31.2 41.4 32.8 42.8 34.5 43.8 C 36.1 44.9 37.8 45.5 39.4 45.9 C 41.1 46.2 42.5 46.4 44.1 46.1 C 45.7 45.4 47.4 43.1 49.1 41.4 C 50.7 39.7 53.2 36.8 54.0 35.9"
+    fill="none"
+    stroke="#c7d2fe"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
