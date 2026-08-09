@@ -22,8 +22,8 @@ import iso226_utils  # noqa: E402
 from iso226_utils import (  # noqa: E402
     ALPHA_R, ANNEX_B_TOLERANCE_DB, ISO226_PHON_MAX, ISO226_PHON_MIN, ISO_AF,
     ISO_FREQ, ISO_TF, REF_1KHZ_INDEX, T_R, VERIFY_RATES, Compensation,
-    MIDBAND_HIGH_HZ, MIDBAND_LOW_HZ, get_filter_response, ideal_delta,
-    iso226_spl, midrange_delta, peak_gain,
+    MATCH_FREQ_HZ, MATCH_NEGLIGIBLE_DB, get_filter_response, ideal_delta,
+    iso226_spl, match_delta, peak_gain,
 )
 
 
@@ -301,50 +301,72 @@ def test_peak_gain_covers_every_verified_rate():
 
 # --- Level matching ---------------------------------------------------------
 
-def test_midrange_delta_is_zero_for_a_transparent_cascade():
+def test_match_delta_is_zero_for_a_transparent_cascade():
     """No gain anywhere means no level difference to correct for."""
-    assert midrange_delta([]) == 0.0
-    assert midrange_delta([('Peak', 1000.0, 0.0, 1.0)]) == pytest.approx(0.0, abs=1e-9)
+    assert match_delta([]) == 0.0
+    assert match_delta([('Peak', 1000.0, 0.0, 1.0)]) == pytest.approx(0.0, abs=1e-9)
 
 
-def test_midrange_delta_barely_moves_for_the_shelves_alone():
-    """The shelves are outside the band being matched, and must stay there.
+def test_match_delta_reads_the_cascade_at_the_match_frequency():
+    """It is the response at MATCH_FREQ_HZ and nothing else.
 
-    This is the regression the published figure was got wrong on. A broadband
-    loudness measure credited the 83->75 shelves below with 2.4 dB, and the
-    83->60 pair with 7.6 dB, so the bypass was told to attenuate the flat side
-    by that much; in the room the flat side then arrived audibly louder,
-    because what the ear matched on was the midrange, where these contribute
-    almost nothing. Any future re-weighting has to keep that true.
+    Stated as an independent evaluation rather than by calling the same
+    helper, so a change to how the measure is defined has to be made here
+    too rather than passing silently.
     """
-    for shelves in ([('Low Shelf', 95.0, 4.59, 0.38),
-                     ('High Shelf', 10070.0, 1.55, 0.76)],
-                    [('Low Shelf', 41.39, 12.0, 0.54),
-                     ('High Shelf', 10150.0, 3.81, 0.89)]):
-        assert abs(midrange_delta(shelves)) < 0.15
+    filters = [('Low Shelf', 95.0, 4.59, 0.38), ('Peak', 320.8, 0.35, 0.25),
+               ('Peak', 898.9, -0.13, 0.42), ('Peak', 2919.0, -0.33, 0.25),
+               ('High Shelf', 10070.0, 1.55, 0.76)]
+    at_500 = get_filter_response(filters, np.array([MATCH_FREQ_HZ]))[0]
+    assert match_delta(filters) == pytest.approx(at_500, abs=1e-12)
 
 
-def test_midrange_delta_follows_a_band_inside_the_matched_range():
-    """What does move it is gain in the band itself, in the obvious direction."""
-    boost = [('Peak', 1500.0, 3.0, 0.7)]
-    cut = [(t, f, -g, q) for t, f, g, q in boost]
-    assert midrange_delta(boost) > 1.0
-    assert midrange_delta(cut) < -1.0
+def test_match_delta_reproduces_the_measured_null():
+    """The one ear-derived calibration point this rule rests on.
 
-
-def test_midrange_delta_stays_within_the_response_it_averages():
-    """A mean cannot escape the range of what it averages.
-
-    The upper half of that is what guarantees the published bypass preamp
-    stays negative: it is the headroom figure plus this delta, and the
-    headroom already covers the peak. Without it a preset could advertise a
-    bypass that asks for boost.
+    83->75 nulled by ear at -3.7 dB against a -4.2 dB headroom, so the bands
+    are worth +0.5 dB. Any redefinition of the measure has to still land
+    there, because that measurement is the whole justification for the
+    frequency -- see the level-matching note in iso226_utils.
     """
-    grid = np.logspace(np.log10(MIDBAND_LOW_HZ), np.log10(MIDBAND_HIGH_HZ), 200)
+    published_75 = [('Low Shelf', 95.0, 4.59, 0.38), ('Peak', 320.8, 0.35, 0.25),
+                    ('Peak', 898.9, -0.13, 0.42), ('Peak', 2919.0, -0.33, 0.25),
+                    ('High Shelf', 10070.0, 1.55, 0.76)]
+    assert match_delta(published_75) == pytest.approx(0.50, abs=0.05)
+
+
+def test_match_delta_follows_the_direction_of_the_correction():
+    """Positive below the mastering reference, negative above it."""
+    boosting = [('Low Shelf', 95.0, 4.59, 0.38), ('High Shelf', 10070.0, 1.55, 0.76)]
+    cutting = [(t, f, -g, q) for t, f, g, q in boosting]
+    assert match_delta(boosting) > 0.0
+    assert match_delta(cutting) < 0.0
+
+
+def test_the_negligible_threshold_is_under_what_a_listener_resolves():
+    """It exists to stop the tables printing a distinction nobody can hear.
+
+    Intensity discrimination for wideband material is around 0.4-0.5 dB, and
+    better than 0.2 dB only for trained listeners with instantaneous
+    switching. A threshold above that would start rounding away differences
+    that are audible.
+    """
+    assert 0.0 < MATCH_NEGLIGIBLE_DB <= 0.25
+
+
+def test_match_delta_never_exceeds_the_peak_gain():
+    """A single point on the response cannot outrun its maximum.
+
+    This is what guarantees the published bypass preamp stays negative: it is
+    the headroom figure plus this delta, and the headroom already covers the
+    peak. Without it a preset could advertise a bypass that asks for boost.
+    """
     for filters in ([('Low Shelf', 41.39, 12.0, 0.54), ('Peak', 120.0, 5.94, 0.25),
                      ('High Shelf', 10150.0, 3.81, 0.89)],
-                    [('Peak', 500.0, 6.0, 0.5)],
+                    [('Peak', 700.0, 6.0, 0.5)],
                     [('High Shelf', 8000.0, 9.0, 0.7)]):
-        in_band = get_filter_response(filters, grid)
-        assert np.min(in_band) - 1e-9 <= midrange_delta(filters) <= np.max(in_band) + 1e-9
-        assert midrange_delta(filters) <= peak_gain(filters) + 1e-9
+        # None of these peaks sit on MATCH_FREQ_HZ itself. peak_gain samples a
+        # 3000-point grid, so a filter centred exactly there reads its own gain
+        # a hair above the sampled maximum -- an artefact of the grid, not a
+        # violation of the property.
+        assert match_delta(filters) <= peak_gain(filters) + 1e-9

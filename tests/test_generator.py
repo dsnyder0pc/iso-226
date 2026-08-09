@@ -25,7 +25,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from check import parse_markdown_filters, parse_markdown_metadata  # noqa: E402
 from iso226_utils import (  # noqa: E402
     EXTRAP_TOLERANCE_DB, VERIFY_RATES, Compensation, build_target,
-    get_filter_response, ideal_delta, midrange_delta, peak_gain,
+    MATCH_NEGLIGIBLE_DB, get_filter_response, ideal_delta, match_delta,
+    peak_gain,
 )
 
 # The published bypass figure, read back out of a generated page. The sentence
@@ -198,10 +199,10 @@ def test_headroom_prevents_clipping_at_every_verified_rate(lf):
 
 # --- Level-matched bypass (fast) --------------------------------------------
 
-def test_bypass_headroom_is_the_headroom_plus_the_midrange_delta(lf):
+def test_bypass_headroom_is_the_headroom_plus_the_match_delta(lf):
     """The published figure is those two numbers and nothing else."""
     headroom = lf.headroom_adjustment(SYNTHETIC)
-    expected = headroom + midrange_delta(SYNTHETIC['filters'])
+    expected = headroom + match_delta(SYNTHETIC['filters'])
     assert lf.bypass_headroom(SYNTHETIC, headroom) == pytest.approx(expected, abs=0.05)
 
 
@@ -219,23 +220,21 @@ def test_bypass_headroom_never_asks_for_boost(lf):
         assert lf.bypass_headroom(result, lf.headroom_adjustment(result)) <= 0.0
 
 
-def test_bypass_tracks_the_midrange_and_not_the_shelves(lf):
-    """Shelf gain outside 500 Hz-5 kHz leaves the bypass where it was.
+def test_bypass_snaps_to_the_headroom_when_the_difference_is_inaudible(lf):
+    """Two numbers a tenth apart invite a distinction nobody can hear.
 
-    Both cases below cut, as every preset above the mastering reference does,
-    and neither touches the band the ear matches on -- so there is nothing for
-    the bypass to take out and it lands on the headroom itself. A midrange
-    band is what moves it, and moves it in that band's direction.
+    Near the mastering reference the correction barely moves the level, so
+    the bypass collapses onto the headroom rather than publishing -1.4 dB
+    beside -1.6 dB. Away from it the two must stay apart.
     """
-    cutting = {'filters': [('Low Shelf', 95.0, -2.5, 0.38),
-                           ('High Shelf', 10070.0, -1.0, 0.76)]}
-    headroom = lf.headroom_adjustment(cutting)
-    assert headroom == 0.0
-    assert lf.bypass_headroom(cutting, headroom) == pytest.approx(0.0, abs=0.05)
+    tiny = {'filters': [('Low Shelf', 60.0, 0.4, 0.4)]}
+    headroom = lf.headroom_adjustment(tiny)
+    assert abs(match_delta(tiny['filters'])) < MATCH_NEGLIGIBLE_DB
+    assert lf.bypass_headroom(tiny, headroom) == headroom
 
-    with_midrange = {'filters': cutting['filters'] + [('Peak', 1500.0, -2.0, 0.6)]}
-    headroom = lf.headroom_adjustment(with_midrange)
-    assert lf.bypass_headroom(with_midrange, headroom) < -0.5
+    real = {'filters': [('Low Shelf', 95.0, 4.59, 0.38)]}
+    headroom = lf.headroom_adjustment(real)
+    assert lf.bypass_headroom(real, headroom) != headroom
 
 
 def test_markdown_publishes_the_bypass_beside_the_headroom(lf, tmp_path):

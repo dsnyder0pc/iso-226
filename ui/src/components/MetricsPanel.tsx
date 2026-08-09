@@ -47,7 +47,7 @@ export function MetricsPanel({ data, level, reference }: Props) {
           icon={<ArrowLeftRight className="h-4 w-4" />}
           label="A/B bypass"
           value={`${fixed(data.bypassHeadroomDb, 1)} dB`}
-          note="Apply this attenuation to the unfiltered signal to compare. Both then match in the midrange, so only the tone changes."
+          note="Apply this attenuation to the unfiltered signal to compare. Both then sound the same size, so only the tone changes."
         />
         <Stat
           icon={<Sliders className="h-4 w-4" />}

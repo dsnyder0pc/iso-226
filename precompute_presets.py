@@ -34,8 +34,8 @@ import sys
 import numpy as np
 
 from iso226_utils import (Compensation, DESIGN_FS, MAX_SCALE, MIN_SCALE,
-                          build_target, get_filter_response, midrange_delta,
-                          peak_gain)
+                          MATCH_NEGLIGIBLE_DB, build_target,
+                          get_filter_response, match_delta, peak_gain)
 
 # The generator's module name is not importable directly (the file name has a
 # hyphen, chosen for the CLI), so load it by path the way check.py does.
@@ -129,7 +129,9 @@ def _fit(job):
         # generator's writers, which take a formatted page rather than a
         # dict; test_api_grid_matches_the_committed_presets is what holds
         # the two definitions together.
-        bypass = round(headroom + midrange_delta(result['filters']), 1)
+        _delta = match_delta(result['filters'])
+        bypass = (headroom if abs(_delta) < MATCH_NEGLIGIBLE_DB
+                  else round(headroom + _delta, 1))
     # At the mastering reference the correction is nothing, and the fit says so
     # by returning every band at 0.00 dB. Publish that as no filters at all,
     # the way PEQ/filter_83_to_83_s1.0.md does: five pass-through biquads are

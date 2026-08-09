@@ -67,7 +67,7 @@ export default function App() {
       return;
     }
     if (data.kind === 'served') {
-      update(data.filters, data.headroomDb);
+      update(data.filters, data.headroomDb, data.bypassHeadroomDb);
     } else {
       // Landing on a refused level -- only reachable by typing a level or
       // following a link, since the slider stops at the servable range -- must
@@ -83,7 +83,7 @@ export default function App() {
     if (preview.playing) {
       preview.stop();
     } else if (data.kind === 'served') {
-      preview.start(data.filters, data.headroomDb);
+      preview.start(data.filters, data.headroomDb, data.bypassHeadroomDb);
     }
   };
 

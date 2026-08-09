@@ -43,11 +43,12 @@ info:
     the filters without prominently displaying the headroom will cause clipping.
 
     `status.preset.bypass_headroom_db` is the companion figure for offering an
-    A/B. The *unfiltered* signal played at that gain sits at the same midrange
-    level as the filtered signal played at `headroom_db`, so a listener
-    switching between them compares tonal balance rather than volume. How a
-    client applies it is up to the client — a second preset, a flat filter, an
-    input trim. It is advisory.
+    A/B. The *unfiltered* signal played at that gain sounds the same size as
+    the filtered signal played at `headroom_db`, so a listener switching
+    between them compares tonal balance rather than volume. How a client
+    applies it is up to the client — a second preset, a flat filter, an input
+    trim. It is advisory, and it is a rule of thumb calibrated by listening
+    rather than a derived quantity.
 
     ## Building a UI against this
 
@@ -138,7 +139,7 @@ paths:
                         band_count: 5
                         design_fs: 44100.0
                         headroom_db: -9.5
-                        bypass_headroom_db: -9.7
+                        bypass_headroom_db: -8.5
                         max_residual_db: 0.0535
                         target_met: false
                       source:
@@ -375,17 +376,16 @@ components:
                   type: number
                   maximum: 0
                   description: |
-                    Gain, in dB, at which the **unfiltered** signal plays at
-                    the same midrange level as this filter set does at
-                    `headroom_db` — the figure to offer for an A/B against no
-                    correction. It lands within a couple of tenths of
-                    `headroom_db`, because what it matches is the midrange,
-                    500 Hz - 5 kHz, which the correction leaves alone by
-                    construction; a client whose gain control cannot reach it
-                    can use `headroom_db` on both sides and be out by that
-                    much. 0 when `filters` is empty. Advisory: ignoring it
-                    loses only the A/B, not the correction.
-                  examples: [-9.7]
+                    Gain, in dB, at which the **unfiltered** signal sounds the
+                    same size as this filter set does at `headroom_db` — the
+                    figure to offer for an A/B against no correction. It is
+                    `headroom_db` plus the cascade's own gain at 500 Hz, and
+                    it is **equal to `headroom_db`** near the mastering
+                    reference, where that gain is under 0.2 dB and the
+                    distinction is below audibility. 0 when `filters` is
+                    empty. Advisory: ignoring it loses only the A/B, not the
+                    correction.
+                  examples: [-8.5]
                 max_residual_db:
                   type: number
                   description: >-

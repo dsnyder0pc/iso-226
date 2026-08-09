@@ -271,11 +271,18 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     the plot's `<svg>`, sized in viewBox units, which scales with the figure
     and not with the type scale — it is still 10–11 units and does shrink on a
     narrow window.
-  - **The preview's bypass keeps the preamp and removes only the bands.** That
-    is what makes it a comparison instead of a volume change: the compensation
-    is 0 dB at 1 kHz by definition, so the filtered midrange already sits at
-    the preamp gain, and holding it there leaves only the tilt to hear. It is
-    the same flat reference the plot draws as a dotted line. The graph
+  - **The preview's bypass removes the bands and moves the preamp to
+    `bypassHeadroomDb`.** The second half is what makes it a comparison
+    instead of a volume change, and it was missing until 2026-08-09: the
+    preamp used to stay put, on the theory that the compensation is 0 dB at
+    1 kHz so the midrange would hold still by itself. Listening says
+    otherwise — flat at the same preamp reads about 0.5 dB smaller in scale at
+    75 dB and 1.2 dB smaller at 60 — which is what the published bypass figure
+    is for, so the page's own A/B now uses it. `update` reads the bypass flag
+    off the graph rather than React state, because a stale closure there would
+    drag the slider's gain onto the wrong side of the comparison. The plot's
+    dotted flat line stays at the preamp: it is the datum the per-band traces
+    are measured from, and 0.5 dB is invisible on that scale anyway. The graph
     allocates one biquad per published band up front rather than one per
     filter, so the slider can move between any two levels — including onto the
     pass-through rung, which has no filters — without a rebuild. An unused
@@ -441,23 +448,33 @@ lives in `regenerate.py` — so this applies to anything new.)
   every table, config, figure and README value, and pushes 60 dB over the
   12 dB budget so the documented floor moves to 61 dB. The filters themselves
   would not change.
-- **The published bypass matches the midrange, not broadband loudness.**
-  `midrange_delta` averages the cascade over 500 Hz–5 kHz and nothing else,
-  so `bypass_headroom` lands within a couple of tenths of the headroom itself.
-  That looks like a null result and is not one. This shipped an ITU-R BS.1770
-  figure until 2026-08-09; listening tests on 83→75 in Roon found the flat
-  side obviously louder, and the arithmetic agrees — K-weighting discounts
-  100 Hz by 1.8 dB against 1 kHz where the ear at 75 phon discounts it by
-  14.0 dB, so it valued the +4.59 dB low shelf at nearly full
-  energy and credited the bypass 2.4 dB, leaving the compensated side's
-  midrange that far down. At 83→60 it was 7.6 dB. **Weighting bass the way an
-  SPL meter does is the error this project exists to correct, so the level
-  match cannot be the one place that commits it.** Do not reintroduce a
-  broadband measure: matching overall loudness pays for the restored extremes
-  by ducking the midrange, which cancels part of the effect being
-  demonstrated. `test_midrange_delta_barely_moves_for_the_shelves_alone` is
-  the regression guard. (An ISO-226-weighted middle option was costed at the
-  same time — +0.81 dB at 75, +1.87 at 60 — and rejected for that reason.)
+- **The published bypass is a rule of thumb, and it is labelled as one.**
+  `match_delta` reads the published cascade at `MATCH_FREQ_HZ` (500 Hz) and
+  nothing else; `bypass_headroom` adds that to the headroom, or returns the
+  headroom unchanged when the two are within `MATCH_NEGLIGIBLE_DB` (0.2).
+  **Do not promote it to a derived quantity.** The evidence is one ear-derived
+  null (83→75 at −3.7 dB against a −4.2 dB headroom, which inverts to 487 Hz)
+  and one confirmed prediction (83→65 at −8.5 dB). One listener, one room.
+  Three better-motivated measures were tried and failed, and the failures are
+  the reason this looks unprincipled: ITU-R BS.1770 credited the bypass 2.4 dB
+  at 83→75 and 7.6 dB at 83→60 because K-weighting discounts 100 Hz by 1.8 dB
+  against 1 kHz where the ear at 75 phon discounts it by 14.0 dB — an SPL
+  meter's valuation of bass inside the tool built to correct exactly that; a
+  midrange average over 500 Hz–5 kHz credited the restored extremes with
+  nothing, and read as too small; an ISO 226-weighted integral over-credited
+  the bass (+0.81 dB predicted against +0.50 measured) and requires the
+  effective frequency to move with level, which the measurements do not
+  support. `test_match_delta_reproduces_the_measured_null` pins the one number
+  this rests on -- it is a fixture guarding against accidental change, not an
+  invitation to retune. **Checked at 65 and 75 dB, which bracket where most
+  listening happens.** The untested rungs are the cheap ones: taking
+  disagreement with the ISO-weighted measure as a rough bound, exposure is
+  0.63 dB at 60 dB, 0.34 at 75, a minimum of 0.12 at 85, then back up to 0.38
+  at 89 as the inverted correction deepens -- so it is *not* monotonic above
+  the reference. The worst case sits at the bottom of the ladder, where a
+  listener discriminates level least well. Absent a revised ISO 226 or
+  published work from a Harman-scale listening programme, this measure is
+  settled; do not re-derive it from theory, because theory lost three times.
 - **Out-of-band regions are constrained, not optimized.** Keep the target
   flat-held below 20 Hz and above 12.5 kHz with `EXTRAP_TOLERANCE_DB`; this is
   what keeps subsonic gain bounded.

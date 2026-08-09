@@ -190,21 +190,22 @@ def test_headroom_is_never_positive(client):
         assert payload["status"]["preset"]["headroom_db"] <= 0.0
 
 
-def test_the_bypass_preamp_is_negative_and_close_to_the_headroom(client):
+def test_the_bypass_preamp_is_negative_and_near_the_headroom(client):
     """Both halves of that matter, and the second one is the interesting half.
 
-    It is a preamp like any other, so it cannot ask for boost. And it matches
-    the midrange, which the correction leaves alone by construction, so it has
-    to land beside the headroom rather than far from it -- a figure a decibel
-    or more away means something has gone back to weighting the whole spectrum
-    and the A/B has a level difference in it again. See the bypass invariant
-    in CLAUDE.md for what that cost the first time.
+    It is a preamp like any other, so it cannot ask for boost. And it is the
+    headroom plus the cascade's gain at 500 Hz, which the gain ceiling keeps
+    small -- 1.2 dB at the deepest rung and under half a decibel over most of
+    the ladder. The bound below is loose enough to allow that and tight enough
+    to catch a return to broadband loudness weighting, which asked for 2.4 dB
+    at 83->75 and 7.6 dB at 83->60. See the bypass invariant in CLAUDE.md for
+    what that cost the first time.
     """
     for offset in range(-23, 8):
         preset = _body(client.get(f"/v1/filters?level={83 + offset}"))["status"]["preset"]
         bypass = preset["bypass_headroom_db"]
         assert bypass <= 0.0
-        assert abs(bypass - preset["headroom_db"]) <= 0.5, (
+        assert abs(bypass - preset["headroom_db"]) <= 2.0, (
             f"offset {offset:+d}: bypass {bypass} against headroom "
             f"{preset['headroom_db']}")
 

@@ -394,49 +394,69 @@ def peak_gain(filters, rates=VERIFY_RATES):
 # filters with work they are not doing. This function sizes that difference so
 # it can be taken out of the comparison.
 #
-# What is matched is the *midrange level*, not a broadband loudness. Until
-# 2026-08-09 this published an ITU-R BS.1770 figure, and listening tests found
-# it plainly wrong in the room. K-weighting discounts 100 Hz by only 1.8 dB
-# against 1 kHz, where the ear at 75 phon discounts it by 14.0 dB and at
-# 60 phon by 18.5 dB. So the low shelf -- +4.59 dB at 95 Hz in the 83->75
-# preset -- counted at nearly full energy value and bought the bypass 2.4 dB
-# of credit.
-# The flat side then arrived with its midrange 2.4 dB hotter and sounded
-# obviously louder. Weighting bass at an SPL meter's valuation is the very
-# thing this project exists to correct, so the level match cannot be the one
-# place that does it; at 83->60 the same measure was 7.6 dB out.
+# The measure is the cascade's own gain at MATCH_FREQ_HZ: draw a flat line
+# across the published response and read off where it crosses. That is a
+# rule of thumb, arrived at by listening, and it is labelled as one here
+# because two better-motivated models were tried first and both failed.
 #
-# Matching the midrange instead leaves the boosted extremes audible, and that
-# is the point: they are the effect being demonstrated, not a confound. The
-# alternative -- equal overall loudness -- pays for them by ducking the
-# midrange, where most of the music is, which is audible in its own right and
-# partly cancels what the comparison is meant to show.
+# ITU-R BS.1770 was first, and was wrong by a wide margin. K-weighting
+# discounts 100 Hz by only 1.8 dB against 1 kHz where the ear at 75 phon
+# discounts it by 14.0 dB, so the low shelf -- +4.59 dB at 95 Hz in the
+# 83->75 preset -- counted at nearly full energy value and bought the bypass
+# 2.4 dB of credit, 7.6 dB at 83->60. Weighting bass at an SPL meter's
+# valuation is the thing this project exists to correct.
 #
-# 500 Hz - 5 kHz is the band the ear judges level over. Power is integrated
-# over log frequency, which weights every octave equally: a pink program
-# restricted to that band. (The measure this replaced applied a further
-# -3 dB/octave tilt on top of a log-frequency integral, which is not pink but
-# steeper, and tilted the answer further towards the bass still.)
-MIDBAND_LOW_HZ = 500.0
-MIDBAND_HIGH_HZ = 5000.0
+# A midrange power average over 500 Hz - 5 kHz replaced it and was also
+# wrong, in the opposite direction and by less: it credits the restored
+# extremes with nothing at all, and in the room the compensated side still
+# read as slightly larger in scale.
+#
+# An ISO 226-weighted integral -- the project's own contours, at the actual
+# playback level -- was the third candidate and the most principled. It
+# over-credits the bass: it predicted +0.81 dB at 83->75 against +0.50
+# measured, and +1.59 at 83->65 against a confirmed +1.05. It also requires
+# the effective frequency to move with level (360 Hz at 75, 397 at 65) and
+# the measurements do not support that.
+#
+# What is left is a single point on the response, and the evidence for it is
+# one ear-derived null plus one confirmed prediction:
+#
+#   83->75, found by ear: -3.7 dB against a -4.2 dB headroom. Inverting that
+#           +0.50 dB against the published cascade gives 487 Hz.
+#   83->65, predicted -8.46 dB from this rule and confirmed indistinguishable
+#           in the room. The ISO-weighted candidate predicted -7.91, half a
+#           decibel away, and half a decibel was audible in the 75 dB test.
+#
+# 500 Hz rather than 487 because two data points do not earn three
+# significant figures, and 500 sits inside the frequency band each
+# measurement is consistent with (462-514 Hz at 75, 476-498 at 65).
+#
+# This wants a listening panel and does not have one. Treat the figure as
+# calibrated, not derived, and do not give it more precision than that.
+MATCH_FREQ_HZ = 500.0
+
+# Below this, the bypass and the headroom are the same setting to a listener,
+# so callers publish one number instead of two near-identical ones. Level
+# differences under about 0.2 dB are not reliably discriminable.
+MATCH_NEGLIGIBLE_DB = 0.2
 
 
-def midrange_delta(filters):
-    """How much louder a cascade's midrange plays than its own bypass, in dB.
+def match_delta(filters):
+    """How much louder a cascade plays than its own bypass, in dB.
 
-    The mean level the filters apply between MIDBAND_LOW_HZ and
-    MIDBAND_HIGH_HZ. Near zero by construction -- the compensation is 0 dB at
-    1 kHz and the correction turns upward outside this band -- so it reports
-    the small residual tilt the fitted interior peaks leave behind, typically
-    a tenth or two of a dB and negative.
+    The cascade's gain at MATCH_FREQ_HZ, which is where a flat line drawn
+    across the published response crosses it. Positive below the mastering
+    reference, where the correction lifts the extremes; negative above it,
+    where it cuts them and the compensated side is the quieter one.
 
-    Both sides carry the same preamp, so the preamp cancels and only the bands
-    are measured.
+    Read from the published filters rather than the ideal target, because
+    those are what a listener actually plays. The two differ by at most
+    0.14 dB, at 60 dB where the fit is loosest, and by 0.02 dB or less
+    everywhere else.
+
+    Both sides carry the same preamp, so the preamp cancels and only the
+    bands are measured.
     """
     if not filters:
         return 0.0
-    grid = np.logspace(np.log10(MIDBAND_LOW_HZ), np.log10(MIDBAND_HIGH_HZ), 1000)
-    response = get_filter_response(filters, grid)
-    log_f = np.log(grid)
-    mean_power = np.trapezoid(10 ** (response / 10.0), log_f) / (log_f[-1] - log_f[0])
-    return 10 * np.log10(mean_power)
+    return float(get_filter_response(filters, np.array([MATCH_FREQ_HZ]))[0])

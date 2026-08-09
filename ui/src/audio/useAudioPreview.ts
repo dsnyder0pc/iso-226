@@ -51,6 +51,10 @@ interface Graph {
   source: AudioBufferSourceNode;
   preamp: GainNode;
   bands: BiquadFilterNode[];
+  /** The preamp each side of the comparison plays at, in dB. */
+  gains: { filtered: number; flat: number };
+  /** Mirrors the `bypassed` state, where callbacks can read it unstaled. */
+  bypassed: boolean;
 }
 
 /**
@@ -105,7 +109,8 @@ export function useAudioPreview() {
     void current.context.close();
   }, []);
 
-  const start = useCallback((filters: Filter[], headroomDb: number) => {
+  const start = useCallback(
+    (filters: Filter[], headroomDb: number, bypassDb: number) => {
     const context = new AudioContext();
     // iOS Safari can hand back a suspended context even when it was created
     // inside the click that asked for it, and a suspended context plays
@@ -117,6 +122,7 @@ export function useAudioPreview() {
 
     const preamp = context.createGain();
     preamp.gain.value = 10 ** (headroomDb / 20);
+    const gains = { filtered: headroomDb, flat: bypassDb };
 
     const bands = Array.from({ length: BAND_SLOTS }, () => context.createBiquadFilter());
     applyFilters(bands, filters);
@@ -130,31 +136,42 @@ export function useAudioPreview() {
     });
 
     source.start();
-    graph.current = { context, source, preamp, bands };
+    graph.current = { context, source, preamp, bands, gains, bypassed: false };
     setSampleRate(context.sampleRate);
     setBypassed(false);
     setPlaying(true);
   }, []);
 
   /** Retune a running graph, so dragging the slider is audible immediately. */
-  const update = useCallback((filters: Filter[], headroomDb: number) => {
-    const current = graph.current;
-    if (!current) {
-      return;
-    }
-    current.preamp.gain.value = 10 ** (headroomDb / 20);
-    applyFilters(current.bands, filters);
-  }, []);
+  const update = useCallback(
+    (filters: Filter[], headroomDb: number, bypassDb: number) => {
+      const current = graph.current;
+      if (!current) {
+        return;
+      }
+      current.gains = { filtered: headroomDb, flat: bypassDb };
+      // Whichever side is audible has to follow the slider. Reading the flag
+      // off the graph rather than the `bypassed` state keeps this correct
+      // without making the callback depend on it -- a stale closure here would
+      // silently drag the wrong gain onto the wrong side.
+      current.preamp.gain.value =
+        10 ** ((current.bypassed ? bypassDb : headroomDb) / 20);
+      applyFilters(current.bands, filters);
+    },
+    [],
+  );
 
   /**
-   * Take the filters out of the path, leaving the headroom in it.
+   * Take the filters out of the path, and move the preamp to the published
+   * bypass figure as they go.
    *
-   * That is what makes this a comparison rather than a volume change. The
-   * compensation is 0 dB at 1 kHz by definition, so the filtered signal's
-   * midrange already sits at the preamp gain — keeping the preamp when the
-   * bands come out holds the midrange still and leaves only the tilt to hear.
-   * It is the same reference the plot draws as the dotted flat line, and the
-   * same one the per-band traces are measured from.
+   * That second half is what makes this a comparison rather than a volume
+   * change, and it used to be missing: the preamp stayed put on the theory
+   * that the compensation is 0 dB at 1 kHz, so the midrange would hold still
+   * by itself. Listening says otherwise -- flat at the same preamp reads
+   * about half a decibel smaller in scale at 75 dB and more than a decibel
+   * smaller at 60 -- which is the whole reason `bypass_headroom_db` exists.
+   * Using it here makes the page's own A/B the one the tables describe.
    */
   const setBypass = useCallback((next: boolean) => {
     setBypassed(next);
@@ -162,6 +179,9 @@ export function useAudioPreview() {
     if (!current) {
       return;
     }
+    current.bypassed = next;
+    current.preamp.gain.value =
+      10 ** ((next ? current.gains.flat : current.gains.filtered) / 20);
     const head = current.bands[0];
     current.source.disconnect();
     current.source.connect(next || !head ? current.preamp : head);
