@@ -43,9 +43,11 @@ info:
     the filters without prominently displaying the headroom will cause clipping.
 
     `status.preset.bypass_headroom_db` is the companion figure for offering an
-    A/B: the same preset with its bands switched off and that preamp in place
-    of `headroom_db` plays at the same midrange level, so the comparison is of
-    tonal balance rather than volume. It is advisory.
+    A/B. The *unfiltered* signal played at that gain sits at the same midrange
+    level as the filtered signal played at `headroom_db`, so a listener
+    switching between them compares tonal balance rather than volume. Where a
+    client applies it is its own business — a second preset, a flat filter, an
+    input trim. It is advisory.
 
     ## Building a UI against this
 
@@ -373,15 +375,16 @@ components:
                   type: number
                   maximum: 0
                   description: |
-                    Preamp for a bypassed copy of this preset, in dB, so the
-                    two can be compared without one arriving louder. Same
-                    bands switched off, this figure in place of
-                    `headroom_db`. It lands within a couple of tenths of
-                    `headroom_db` because what it matches is the midrange,
+                    Gain, in dB, at which the **unfiltered** signal plays at
+                    the same midrange level as this filter set does at
+                    `headroom_db` — the figure to offer for an A/B against no
+                    correction. It lands within a couple of tenths of
+                    `headroom_db`, because what it matches is the midrange,
                     500 Hz - 5 kHz, which the correction leaves alone by
-                    construction. 0 when `filters` is empty. Advisory: a
-                    client that ignores it loses only the A/B, not the
-                    correction.
+                    construction; a client whose gain control cannot reach it
+                    can use `headroom_db` on both sides and be out by that
+                    much. 0 when `filters` is empty. Advisory: ignoring it
+                    loses only the A/B, not the correction.
                   examples: [-9.7]
                 max_residual_db:
                   type: number

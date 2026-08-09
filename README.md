@@ -553,13 +553,20 @@ leaves alone: the compensation is 0 dB at 1 kHz by definition and turns upward
 only outside that band. So every table publishes a second number beside the
 headroom figure:
 
-> **To compare against no correction, bypass at −4.3 dB.**
+> **To compare against no correction, play the unfiltered signal at −4.3 dB.**
 
-Make a second preset that is identical except that the five bands are switched
-off and the headroom is set to that value instead. It will land within a couple
-of tenths of the headroom itself, which is the point rather than an anticlimax —
-there is very little to take out. Switching between the two now changes tonal
-balance and nothing else.
+How you apply that depends entirely on your player, and the tables do not
+presume. In Roon it can be a second preset with the bands switched off, or a
+Procedural EQ block carrying only the gain; in miniDSP or a WiiM it is an input
+trim; JRiver, HQPlayer and Audirvana each have their own place for a flat
+attenuation. The figure is what the tables publish, not the method.
+
+It lands within a couple of tenths of the headroom itself, which is the point
+rather than an anticlimax — there is very little to take out. That also makes
+the fallback easy: if your player's preamp will not reach it, use the headroom
+figure on both sides and be out by a tenth or two, well below audibility. At the
+very bottom of the ladder that is the only option in some hosts — the 60 dB
+preset asks for −12.2 dB, and Roon's preamp range ends at ±12 dB.
 
 Reaching for an SPL meter instead does not work. C-weighting is nearly flat, so
 it counts the restored bass energy that your ears, at this level, do not — the

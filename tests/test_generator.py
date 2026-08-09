@@ -28,6 +28,12 @@ from iso226_utils import (  # noqa: E402
     get_filter_response, ideal_delta, midrange_delta, peak_gain,
 )
 
+# The published bypass figure, read back out of a generated page. The sentence
+# carrying it is deliberately not a recipe -- every host applies a flat
+# attenuation somewhere different -- so this matches the figure and its noun,
+# not an instruction.
+BYPASS_RE = r"unfiltered signal at\s*(-?[0-9.]+)\s*dB"
+
 # A hand-built result standing in for a generated one, so the format tests stay
 # fast. Values are plausible but arbitrary, and already at publication
 # precision -- four significant figures of frequency, two decimals of gain and Q
@@ -239,7 +245,7 @@ def test_markdown_publishes_the_bypass_beside_the_headroom(lf, tmp_path):
     text = path.read_text(encoding="utf-8")
     bypass = lf.bypass_headroom(SYNTHETIC, -9.5)
     assert "Headroom adjustment: -9.5 dB" in text
-    assert f"bypass at {bypass:.1f} dB" in text
+    assert f"unfiltered signal at {bypass:.1f} dB" in text
 
 
 def test_the_bypass_line_is_not_mistaken_for_a_table_row(lf, tmp_path):
@@ -512,10 +518,10 @@ def test_committed_preset_publishes_its_own_bypass(lf, stem, path):
         text = handle.read()
     filters = parse_markdown_filters(path)
     if not filters:
-        assert "bypass" not in text.lower(), (
+        assert not re.search(BYPASS_RE, text), (
             f"{stem} has no filters but still offers a bypass")
         return
-    match = re.search(r"bypass at\s*(-?[0-9.]+)\s*dB", text)
+    match = re.search(BYPASS_RE, text)
     assert match, f"{stem} does not publish a level-matched bypass"
     result = {'filters': filters}
     expected = lf.bypass_headroom(result, lf.headroom_adjustment(result))
@@ -582,7 +588,7 @@ def test_api_grid_matches_the_committed_presets():
         # same filters, so it catches a level-matching change that reached one
         # writer and not the other -- which the filter rows above cannot.
         with open(path, encoding="utf-8") as fh:
-            match = re.search(r"bypass at\s*(-?[0-9.]+)\s*dB", fh.read())
+            match = re.search(BYPASS_RE, fh.read())
         expected = float(match.group(1)) if match else 0.0
         assert entry["bypass_headroom_db"] == pytest.approx(expected, abs=1e-9), (
             f"{stem}: PEQ/ publishes a bypass of {expected} dB and the API "
