@@ -705,9 +705,10 @@ def write_markdown_table(result, comp, headroom, filename, image=None):
         f"{'/'.join(f'{r / 1000:g}' for r in VERIFY_RATES)} kHz.",
         "",
         f"**To compare against no correction, play the unfiltered signal at "
-        f"{bypass:.1f} dB.** How you apply that is your player's business — a "
-        "second preset with its bands switched off, a flat filter carrying "
-        "only a preamp, a volume trim. The figure is what matters: it holds "
+        f"{bypass:.1f} dB.** How you apply that attenuation varies from one "
+        "DSP to the next, so consult your player's documentation — it may be "
+        "a second preset with its bands switched off, a flat filter carrying "
+        "only a preamp, or an input trim. The figure is what matters: it holds "
         "the two at the same level across 500 Hz–5 kHz, the band the ear "
         "judges level over, so switching between them compares tonal balance "
         "rather than volume. The louder of two similar presentations almost "

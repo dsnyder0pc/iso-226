@@ -45,8 +45,8 @@ info:
     `status.preset.bypass_headroom_db` is the companion figure for offering an
     A/B. The *unfiltered* signal played at that gain sits at the same midrange
     level as the filtered signal played at `headroom_db`, so a listener
-    switching between them compares tonal balance rather than volume. Where a
-    client applies it is its own business — a second preset, a flat filter, an
+    switching between them compares tonal balance rather than volume. How a
+    client applies it is up to the client — a second preset, a flat filter, an
     input trim. It is advisory.
 
     ## Building a UI against this

@@ -396,9 +396,11 @@ def peak_gain(filters, rates=VERIFY_RATES):
 #
 # What is matched is the *midrange level*, not a broadband loudness. Until
 # 2026-08-09 this published an ITU-R BS.1770 figure, and listening tests found
-# it plainly wrong in the room: K-weighting's high-pass is only about -0.5 dB
-# at 100 Hz, so the low shelf -- +4.59 dB at 95 Hz in the 83->75 preset --
-# counted at nearly full energy value and bought the bypass 2.4 dB of credit.
+# it plainly wrong in the room. K-weighting discounts 100 Hz by only 1.8 dB
+# against 1 kHz, where the ear at 75 phon discounts it by 14.0 dB and at
+# 60 phon by 18.5 dB. So the low shelf -- +4.59 dB at 95 Hz in the 83->75
+# preset -- counted at nearly full energy value and bought the bypass 2.4 dB
+# of credit.
 # The flat side then arrived with its midrange 2.4 dB hotter and sounded
 # obviously louder. Weighting bass at an SPL meter's valuation is the very
 # thing this project exists to correct, so the level match cannot be the one

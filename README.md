@@ -555,8 +555,9 @@ headroom figure:
 
 > **To compare against no correction, play the unfiltered signal at −4.3 dB.**
 
-How you apply that depends entirely on your player, and the tables do not
-presume. In Roon it can be a second preset with the bands switched off, or a
+How you apply that attenuation varies from one DSP to the next, so the tables
+name the figure and leave the method to your player's documentation. In Roon it
+can be a second preset with the bands switched off, or a
 Procedural EQ block carrying only the gain; in miniDSP or a WiiM it is an input
 trim; JRiver, HQPlayer and Audirvana each have their own place for a flat
 attenuation. The figure is what the tables publish, not the method.
@@ -581,8 +582,9 @@ that measure the 75 dB preset appears to add 2.4 dB and the 60 dB preset 7.6 dB,
 so the bypass was told to attenuate the flat side by that much. In the room it
 was obvious within seconds: the flat side came back distinctly louder. The
 reason is the same one this whole project exists for. BS.1770's weighting curve
-is barely down half a dB at 100 Hz, so it counts restored bass at nearly full
-value; your ears at 75 dB do not. It is C-weighting's mistake wearing a
+discounts 100 Hz by 1.8 dB relative to 1 kHz; your ears at 75 dB discount it by
+14.0 dB. So it counts restored bass at very nearly full value and they do not.
+It is C-weighting's mistake wearing a
 broadcast standard's clothes, and it left the corrected side's midrange 2.4 dB
 down — well past the roughly 1 dB where a midrange level difference becomes
 plainly audible.

@@ -446,8 +446,9 @@ lives in `regenerate.py` — so this applies to anything new.)
   so `bypass_headroom` lands within a couple of tenths of the headroom itself.
   That looks like a null result and is not one. This shipped an ITU-R BS.1770
   figure until 2026-08-09; listening tests on 83→75 in Roon found the flat
-  side obviously louder, and the arithmetic agrees — K-weighting is barely
-  0.5 dB down at 100 Hz, so it valued the +4.59 dB low shelf at nearly full
+  side obviously louder, and the arithmetic agrees — K-weighting discounts
+  100 Hz by 1.8 dB against 1 kHz where the ear at 75 phon discounts it by
+  14.0 dB, so it valued the +4.59 dB low shelf at nearly full
   energy and credited the bypass 2.4 dB, leaving the compensated side's
   midrange that far down. At 83→60 it was 7.6 dB. **Weighting bass the way an
   SPL meter does is the error this project exists to correct, so the level
