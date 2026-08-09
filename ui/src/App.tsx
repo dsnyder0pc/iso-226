@@ -233,9 +233,8 @@ function Provenance() {
           <li>Enable the filter and play music at that level.</li>
         </ol>
         <p className="mt-3">
-          Repeat for your other scenarios. Two or three presets cover most
-          listening — the rungs are 3 dB apart, and the nearer one costs at most
-          about 0.8 dB.
+          Repeat for your other scenarios. Two or three saved presets cover most
+          listening.
         </p>
       </section>
 

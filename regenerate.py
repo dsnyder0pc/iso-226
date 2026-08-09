@@ -46,9 +46,20 @@ checker = _load("checker", "check.py")
 REFERENCE = 83.0        # the Katz monitoring convention; see the README
 SCALE = 1.0             # full theoretical correction
 
-# 3 dB steps across the usable range, plus the two rungs below the grid that
-# still fit. 89 dB is three steps above the reference, past which the
-# correction is a slight cut.
+# The rungs are the levels people actually choose, not an arithmetic grid. An
+# even 3 dB series is tidy to generate and slightly wrong to use: it spends
+# steps where nobody sits and skips the round numbers they reach for. So the
+# spacing is 1 dB at the floor, where the correction moves fastest and the fit
+# is tightest, and 2-3 dB through the range anyone listens in, landing on the
+# values a listener is likely to have measured. 89 dB is the top, past which
+# the correction is a slight cut anyway.
+#
+# No gap exceeds 3 dB, so snapping to the nearer rung still costs at most
+# 0.79 dB of correction -- measured across the whole ladder, not assumed, and
+# inside the uncertainty of the listener's own SPL reading. Because the
+# correction depends on (level - reference) rather than on either level alone,
+# these same files serve every mastering reference from 72 to 85 dB -- see the
+# equivalence table in the README.
 #
 # 60 dB is the floor, not 62: at 59 dB the fitted cascade needs 12.35 dB and is
 # refused. The generator's own --level suggestion still says 62, because
@@ -61,17 +72,10 @@ SCALE = 1.0             # full theoretical correction
 # 0.09 at 62 dB, with the low shelf pinned to the 12 dB cap. Still well below
 # audibility, but do not read them as typical.
 #
-# A listener whose measured level falls between two rungs snaps to the nearer
-# one and loses at most ~0.8 dB, which sits inside the uncertainty of their own
-# SPL measurement. Because the correction depends on (level - reference) rather
-# than on either level alone, these same files serve every mastering reference
-# from 72 to 85 dB -- see the equivalence table in the README.
-LADDER = [60, 61, 62, 65, 68, 71, 74, 77, 80, 83, 86, 89]
-
-# Not on the 3 dB grid, but they are the levels the README and the article use
-# as illustrations, so they ship too rather than leaving those examples
-# undownloadable.
-EXTRA = [75, 85]
+# 83 dB is the reference itself. It carries no filters and says so; it ships
+# because a listener already at their reference level who reaches for the
+# nearest rung instead applies about 1.6 dB of correction they do not want.
+LADDER = [60, 61, 62, 65, 68, 70, 72, 75, 78, 80, 83, 85, 87, 89]
 
 # These additionally get an error plot in images/, because the README quotes
 # them as worked examples. Every preset gets a response plot regardless: the
@@ -134,15 +138,11 @@ def main():
                         help="show what would be generated, then exit")
     args = parser.parse_args()
 
-    levels = sorted(set(LADDER) | set(EXTRA))
+    levels = sorted(LADDER)
     if args.list:
         print(f"reference {REFERENCE:g} dB, scale {SCALE:g}\n")
         for level in levels:
-            marks = []
-            if level in LADDER:
-                marks.append("ladder")
-            if level in EXTRA:
-                marks.append("extra")
+            marks = ["ladder"]
             if level in FEATURED:
                 marks.append("error plot")
             print(f"  {level:3d} dB  ({level - REFERENCE:+3.0f} dB relative)"

@@ -95,7 +95,7 @@ python precompute_presets.py
 ```
 
 `regenerate.py` is the single source of truth for which presets ship — the
-`LADDER`, `EXTRA` and `FEATURED` lists in that file, not the contents of
+`LADDER` and `FEATURED` lists in that file, not the contents of
 `PEQ/` or `REW/`.
 Run it after any change to the math, the optimizer or the coefficients, then
 reconcile the README, which quotes headroom values, residual errors and filter
