@@ -41,6 +41,7 @@ over.
     - [Pre-generated filters (no Python required)](#pre-generated-filters-no-python-required)
     - [Loading into REW](#loading-into-rew)
     - [Applying the headroom adjustment](#applying-the-headroom-adjustment)
+    - [Hearing what the filters do — a fair comparison](#hearing-what-the-filters-do--a-fair-comparison)
     - [Gain limits on real hardware](#gain-limits-on-real-hardware)
     - [Recordings mastered quietly](#recordings-mastered-quietly)
 8.  [Generated Presets](#generated-presets)
@@ -263,13 +264,13 @@ bands exhaust it:
 | 62 dB | 0.0925 dB |
 | 65 dB | 0.0535 dB |
 | 68 dB | 0.0417 dB |
-| 71 dB | 0.0486 dB |
-| 74 dB | 0.0265 dB |
+| 70 dB | 0.0469 dB |
+| 72 dB | 0.0430 dB |
 | 75 dB | 0.0320 dB |
-| 77 dB | 0.0284 dB |
+| 78 dB | 0.0216 dB |
 | 80 dB | 0.0217 dB |
 | 85 dB | 0.0171 dB |
-| 86 dB | 0.0192 dB |
+| 87 dB | 0.0310 dB |
 | 89 dB | 0.0229 dB |
 
 Measured on the dense fitting grid. Evaluated instead at the 29 ISO preferred
@@ -353,9 +354,9 @@ The workflow it is built around:
    the right correction at the level it was fitted for.
 
 Then repeat for your other scenarios. **Two or three presets cover most
-listening.** The ladder runs in 3 dB steps and snapping to the nearer rung costs
-at most about 0.8 dB, comfortably inside the uncertainty of the measurement
-itself, so there is no need for a preset per decibel. Roon will hold an
+listening.** No two rungs are more than 3 dB apart and snapping to the nearer
+one costs at most 0.79 dB, comfortably inside the uncertainty of the
+measurement itself, so there is no need for a preset per decibel. Roon will hold an
 unlimited number of saved PEQ sets per zone; less flexible software usually
 holds a few, which is enough.
 
@@ -441,14 +442,14 @@ values below from a single page — see [Using the web app](#using-the-web-app).
 | [table](PEQ/filter_83_to_62_s1.0.md) · [yaml](REW/filter_83_to_62_s1.0.yml) | 62 dB — very quiet | −21 dB |
 | [table](PEQ/filter_83_to_65_s1.0.md) · [yaml](REW/filter_83_to_65_s1.0.yml) | 65 dB — quiet | −18 dB |
 | [table](PEQ/filter_83_to_68_s1.0.md) · [yaml](REW/filter_83_to_68_s1.0.yml) | 68 dB | −15 dB |
-| [table](PEQ/filter_83_to_71_s1.0.md) · [yaml](REW/filter_83_to_71_s1.0.yml) | 71 dB | −12 dB |
-| [table](PEQ/filter_83_to_74_s1.0.md) · [yaml](REW/filter_83_to_74_s1.0.yml) | 74 dB | −9 dB |
+| [table](PEQ/filter_83_to_70_s1.0.md) · [yaml](REW/filter_83_to_70_s1.0.yml) | 70 dB | −13 dB |
+| [table](PEQ/filter_83_to_72_s1.0.md) · [yaml](REW/filter_83_to_72_s1.0.yml) | 72 dB | −11 dB |
 | [table](PEQ/filter_83_to_75_s1.0.md) · [yaml](REW/filter_83_to_75_s1.0.yml) | 75 dB — moderate | −8 dB |
-| [table](PEQ/filter_83_to_77_s1.0.md) · [yaml](REW/filter_83_to_77_s1.0.yml) | 77 dB | −6 dB |
+| [table](PEQ/filter_83_to_78_s1.0.md) · [yaml](REW/filter_83_to_78_s1.0.yml) | 78 dB | −5 dB |
 | [table](PEQ/filter_83_to_80_s1.0.md) · [yaml](REW/filter_83_to_80_s1.0.yml) | 80 dB | −3 dB |
 | [table](PEQ/filter_83_to_83_s1.0.md) · [yaml](REW/filter_83_to_83_s1.0.yml) | 83 dB — at reference | 0 dB *(no correction)* |
 | [table](PEQ/filter_83_to_85_s1.0.md) · [yaml](REW/filter_83_to_85_s1.0.yml) | 85 dB — loud | +2 dB |
-| [table](PEQ/filter_83_to_86_s1.0.md) · [yaml](REW/filter_83_to_86_s1.0.yml) | 86 dB | +3 dB |
+| [table](PEQ/filter_83_to_87_s1.0.md) · [yaml](REW/filter_83_to_87_s1.0.yml) | 87 dB | +4 dB |
 | [table](PEQ/filter_83_to_89_s1.0.md) · [yaml](REW/filter_83_to_89_s1.0.yml) | 89 dB | +6 dB |
 
 The **`.md`** tables render as a page in the GitHub and GitLab file browsers:
@@ -457,11 +458,13 @@ figure to enter alongside them, and the response plot underneath so you can
 check the curve your DSP draws against the one it should be. The **`.yml`**
 files load straight into REW or CamillaDSP and need no typing at all.
 
-The ladder runs in 3 dB steps, so a listener whose measured level falls
-between two rungs loses at most about 0.8 dB by snapping to the nearer one —
-comfortably inside the uncertainty of their own SPL measurement. The 75 and
-85 dB entries are not on the 3 dB grid; they are there because the worked
-examples below use them.
+The rungs are the levels people actually choose rather than an even grid: 1 dB
+apart at the floor, where the correction changes fastest, and 2–3 dB apart
+through the range anyone listens in, landing on the round numbers you are
+likely to have measured. No gap is wider than 3 dB, so a listener whose level
+falls between two rungs loses at most **0.79 dB** of correction by snapping to
+the nearer one — comfortably inside the uncertainty of their own SPL
+measurement.
 
 The 83 dB entry is the case where you are already listening at the level the
 recording was mastered for, so the correct answer is to apply nothing. It ships
@@ -496,14 +499,14 @@ So each file above serves any reference at the same offset:
 | `..._to_62_...` | −21 | 51 | 54 | 57 | 59 | **62** | 64 |
 | `..._to_65_...` | −18 | 54 | 57 | 60 | 62 | **65** | 67 |
 | `..._to_68_...` | −15 | 57 | 60 | 63 | 65 | **68** | 70 |
-| `..._to_71_...` | −12 | 60 | 63 | 66 | 68 | **71** | 73 |
-| `..._to_74_...` | −9 | 63 | 66 | 69 | 71 | **74** | 76 |
+| `..._to_70_...` | −13 | 59 | 62 | 65 | 67 | **70** | 72 |
+| `..._to_72_...` | −11 | 61 | 64 | 67 | 69 | **72** | 74 |
 | `..._to_75_...` | −8 | 64 | 67 | 70 | 72 | **75** | 77 |
-| `..._to_77_...` | −6 | 66 | 69 | 72 | 74 | **77** | 79 |
+| `..._to_78_...` | −5 | 67 | 70 | 73 | 75 | **78** | 80 |
 | `..._to_80_...` | −3 | 69 | 72 | 75 | 77 | **80** | 82 |
 | `..._to_83_...` | 0 | 72 | 75 | 78 | 80 | **83** | 85 |
 | `..._to_85_...` | +2 | 74 | 77 | 80 | 82 | **85** | 87 |
-| `..._to_86_...` | +3 | 75 | 78 | 81 | 83 | **86** | 88 |
+| `..._to_87_...` | +4 | 76 | 79 | 82 | 84 | **87** | 89 |
 | `..._to_89_...` | +6 | 78 | 81 | 84 | 86 | **89** | 91 |
 
 Listening at 60 dB to something mastered for 78 dB? That is −18, so
@@ -536,6 +539,59 @@ That figure is:
 * the **worst case across 44.1 / 48 / 96 / 192 kHz** (see below), and
 * rounded away from zero to 0.1 dB — the preamp field is the one place Roon
   really is limited to a single decimal.
+
+### Hearing what the filters do — a fair comparison
+
+The obvious way to judge a preset is to switch it off and on. Done the obvious
+way, that comparison is rigged, and it is rigged in the filters' favour.
+
+The correction is 0 dB at 1 kHz by definition and rises either side of it, so
+with the same headroom setting on both sides the corrected version arrives
+**louder** — by 2.4 dB at 75 dB, and by 7.6 dB at 60 dB. Between two similar
+presentations, the louder one is reliably judged the better one, whatever else
+is true of it. Left uncorrected, that effect is large enough to account for the
+whole result on its own, and you would learn nothing about the filters.
+
+Reaching for an SPL meter does not fix it either. C-weighting is nearly flat, so
+it counts the restored bass energy that your ears, at this level, do not — the
+corrected preset will read higher on the meter even when the two are perceptually
+matched. The meter is the right tool for finding your `--level` and the wrong
+one for this.
+
+So every table publishes a second number beside the headroom figure:
+
+> **To compare against no correction, bypass at −1.8 dB.**
+
+Make a second preset that is identical except that the five bands are switched
+off and the headroom is set to that value instead. Switching between the two
+now changes tonal balance and nothing else.
+
+That figure is the published headroom plus the loudness the bands add, measured
+as **[ITU-R BS.1770](#references) integrated loudness** — the same standard
+streaming services use to level-match tracks — over a pink program spectrum. Two
+things follow from having modelled the program rather than measured your
+recording:
+
+* **One number per preset is enough.** Tilting the model spectrum from pink to
+  distinctly bass-heavy moves the answer by about half a dB, so the figure does
+  not need to be quoted per recording.
+* **It is an estimate, good to a few tenths.** That is well inside what anyone
+  can match by ear, but if you want the exact figure for one track, render it
+  through both chains and measure with `ffmpeg -af ebur128`.
+
+Above your mastering reference the correction inverts — it cuts the extremes
+rather than boosting them — so the corrected version is the *quieter* one and
+the published bypass figure attenuates the flat side to meet it. The arithmetic
+is the same; only the sign changes.
+
+One caveat worth stating plainly, because it cuts against the number above.
+Matching the loudness deliberately removes part of what the filters do: restored
+bass and treble *is* added loudness, and a broadband gain that cancels it
+cancels some of the effect along with the confound. That is the right trade —
+what these filters claim to fix is spectral balance, not level, and that is what
+the matched comparison isolates. But it means a level-matched A/B understates
+the difference you will hear in ordinary listening, where no one is holding the
+loudness constant.
 
 ### Gain limits on real hardware
 
@@ -599,7 +655,7 @@ two decimals even though its values look small.
 
 ### Quiet — 65 dB
 
-**Headroom adjustment `-9.5 dB`** · max residual error **0.0533 dB**
+**Headroom adjustment `-9.5 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-3.7 dB` · max residual error **0.0533 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
@@ -614,7 +670,7 @@ two decimals even though its values look small.
 
 ### Moderate — 75 dB
 
-**Headroom adjustment `-4.2 dB`** · max residual error **0.0311 dB**
+**Headroom adjustment `-4.2 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-1.8 dB` · max residual error **0.0311 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
@@ -631,7 +687,7 @@ two decimals even though its values look small.
 
 Above the 83 dB reference, so the correction is a slight *cut* at the extremes.
 
-**Headroom adjustment `-0.1 dB`** · max residual error **0.0162 dB**
+**Headroom adjustment `-0.1 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-0.6 dB` · max residual error **0.0162 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |

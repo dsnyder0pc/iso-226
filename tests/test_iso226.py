@@ -22,7 +22,8 @@ import iso226_utils  # noqa: E402
 from iso226_utils import (  # noqa: E402
     ALPHA_R, ANNEX_B_TOLERANCE_DB, ISO226_PHON_MAX, ISO226_PHON_MIN, ISO_AF,
     ISO_FREQ, ISO_TF, REF_1KHZ_INDEX, T_R, VERIFY_RATES, Compensation,
-    get_filter_response, ideal_delta, iso226_spl, peak_gain,
+    get_filter_response, ideal_delta, iso226_spl, k_weighting_db,
+    loudness_delta, peak_gain,
 )
 
 
@@ -296,3 +297,67 @@ def test_peak_gain_covers_every_verified_rate():
     grid = np.logspace(np.log10(20), np.log10(20000), 500)
     for rate in VERIFY_RATES:
         assert np.max(get_filter_response(filters, grid, rate)) <= worst + 1e-9
+
+
+# --- Loudness matching ------------------------------------------------------
+
+def test_k_weighting_matches_the_bs1770_calibration_point():
+    """BS.1770 fixes the gain at 997 Hz, so this is an external anchor.
+
+    The Recommendation calibrates its loudness scale with a -0.691 dB offset,
+    chosen so a 997 Hz sine at 0 dBFS reads -3.01 LKFS. That is only true if
+    the weighting itself contributes exactly +0.691 dB there. Like the Annex B
+    check above, this compares against a published number rather than against
+    anything the repository computes.
+    """
+    assert k_weighting_db(np.array([997.0]))[0] == pytest.approx(0.691, abs=5e-4)
+
+
+def test_k_weighting_has_its_shelf_and_its_highpass():
+    """The two stages are a ~+4 dB HF shelf and a high-pass below ~100 Hz."""
+    shelf = k_weighting_db(np.array([8000.0, 16000.0]))
+    assert shelf == pytest.approx([4.0, 4.0], abs=0.15)
+    assert k_weighting_db(np.array([40.0]))[0] < -4.0
+    assert k_weighting_db(np.array([20.0]))[0] < k_weighting_db(np.array([40.0]))[0]
+
+
+def test_loudness_delta_is_zero_for_a_transparent_cascade():
+    """No gain anywhere means no loudness difference to correct for."""
+    assert loudness_delta([]) == 0.0
+    assert loudness_delta([('Peak', 1000.0, 0.0, 1.0)]) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_loudness_delta_follows_the_direction_of_the_correction():
+    """Boosting the extremes adds loudness; cutting them removes it."""
+    boost = [('Low Shelf', 95.0, 4.59, 0.38), ('High Shelf', 10070.0, 1.55, 0.76)]
+    cut = [(t, f, -g, q) for t, f, g, q in boost]
+    assert loudness_delta(boost) > 0.5
+    assert loudness_delta(cut) < -0.5
+
+
+def test_loudness_delta_never_exceeds_the_peak_gain():
+    """A weighted average of the response cannot outrun its maximum.
+
+    This is what guarantees the published bypass preamp stays negative: it is
+    the headroom figure plus this delta, and the headroom already covers the
+    peak. Without it a preset could advertise a bypass that asks for boost.
+    """
+    for filters in ([('Low Shelf', 41.39, 12.0, 0.54), ('Peak', 120.0, 5.94, 0.25),
+                     ('High Shelf', 10150.0, 3.81, 0.89)],
+                    [('Peak', 500.0, 6.0, 0.5)],
+                    [('High Shelf', 8000.0, 9.0, 0.7)]):
+        assert loudness_delta(filters) <= peak_gain(filters) + 1e-9
+
+
+def test_loudness_delta_is_insensitive_to_the_program_spectrum(monkeypatch):
+    """One figure per preset only holds if the model spectrum barely matters.
+
+    Pink is the published assumption. Tilting it a further 1.5 dB/octave
+    towards the bass -- well past any real recording -- must not move the
+    answer by more than a few tenths, or the number would have to be quoted
+    per recording instead of per preset.
+    """
+    filters = [('Low Shelf', 95.0, 4.59, 0.38), ('High Shelf', 10070.0, 1.55, 0.76)]
+    pink = loudness_delta(filters)
+    monkeypatch.setattr(iso226_utils, 'PROGRAM_SLOPE_DB_PER_OCT', -4.5)
+    assert loudness_delta(filters) == pytest.approx(pink, abs=0.6)

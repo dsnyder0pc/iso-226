@@ -384,3 +384,68 @@ def peak_gain(filters, rates=VERIFY_RATES):
     grid = np.logspace(np.log10(20.0), np.log10(20000.0), 3000)
     return max(float(np.max(get_filter_response(filters, grid, fs)))
                for fs in rates)
+
+
+# --- Loudness matching ------------------------------------------------------
+# A compensation curve boosts the extremes and leaves 1 kHz alone, so a preset
+# and its own bypass do not play at the same loudness even on an identical
+# preamp. Comparing them as-is compares volume, and the louder of two similar
+# presentations is reliably preferred -- which would credit the filters with
+# work they are not doing. These functions size that difference so it can be
+# taken out of the comparison.
+
+# ITU-R BS.1770 K-weighting, as the two biquad stages the Recommendation
+# publishes: a high-frequency shelf and the RLB high-pass. Its coefficients are
+# specified at 48 kHz, so everything here is evaluated at that rate -- one of
+# VERIFY_RATES already. Only the magnitude response is used; no audio is
+# filtered, so there is nothing to resample.
+LOUDNESS_FS = 48000.0
+_K_SHELF = ([1.53512485958697, -2.69169618940638, 1.19839281085285],
+            [1.0, -1.69065929318241, 0.73248077421585])
+_K_RLB = ([1.0, -2.0, 1.0],
+          [1.0, -1.99004745483398, 0.99007225036621])
+
+# Pink -- equal power per octave -- stands in for musical program material.
+# The choice matters less than it looks: tilting the model spectrum from pink
+# to distinctly bass-heavy moves the answer by about half a dB, so one figure
+# per preset is publishable and per-recording matching is not needed.
+PROGRAM_SLOPE_DB_PER_OCT = -3.0
+
+
+def k_weighting_db(frequencies):
+    """ITU-R BS.1770 K-weighting magnitude, in dB, at the given frequencies."""
+    frequencies = np.asarray(frequencies, dtype=float)
+    w_eval = 2 * np.pi * frequencies / LOUDNESS_FS
+    total_h = np.ones(len(frequencies), dtype=complex)
+    for b, a in (_K_SHELF, _K_RLB):
+        _, h = freqz(b, a, worN=w_eval)
+        total_h *= h
+    return 20 * np.log10(np.abs(total_h))
+
+
+def loudness_delta(filters):
+    """How much louder a cascade plays than its own bypass, in dB.
+
+    The BS.1770 loudness of a modelled program spectrum with the filters
+    applied, less the same spectrum without them. Positive means the filters
+    add loudness, which is the usual case below the mastering reference; a
+    preset for a level *above* the reference cuts the extremes and returns a
+    negative figure.
+
+    Both sides carry the same preamp, so the preamp cancels and only the bands
+    are measured. This is an estimate from a spectrum model rather than a
+    measurement of a recording -- good to a few tenths, which is well inside
+    what a listener can match by ear.
+    """
+    if not filters:
+        return 0.0
+    grid = np.logspace(np.log10(20.0), np.log10(20000.0), 3000)
+    program = (PROGRAM_SLOPE_DB_PER_OCT * np.log2(grid / 1000.0)
+               + k_weighting_db(grid))
+    response = get_filter_response(filters, grid, LOUDNESS_FS)
+    # Power integrated over log frequency: on a geometric grid that is what
+    # weights every octave equally, matching how the program spectrum is stated.
+    log_f = np.log(grid)
+    bypassed = np.trapezoid(10 ** (program / 10.0), log_f)
+    filtered = np.trapezoid(10 ** ((program + response) / 10.0), log_f)
+    return 10 * np.log10(filtered / bypassed)
