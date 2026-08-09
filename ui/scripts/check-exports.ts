@@ -27,6 +27,7 @@ interface PresetEntry {
   offset: number;
   refused: boolean;
   headroom_db?: number;
+  bypass_headroom_db?: number;
   max_residual_db?: number;
   filters?: Filter[];
 }
@@ -49,6 +50,7 @@ function served(entry: PresetEntry): ServedLevel {
     kind: 'served',
     offset: entry.offset,
     headroomDb: entry.headroom_db ?? 0,
+    bypassHeadroomDb: entry.bypass_headroom_db ?? 0,
     maxResidualDb: entry.max_residual_db ?? 0,
     targetMet: true,
     filters: entry.filters ?? [],

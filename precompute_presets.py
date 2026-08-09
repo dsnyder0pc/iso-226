@@ -34,7 +34,8 @@ import sys
 import numpy as np
 
 from iso226_utils import (Compensation, DESIGN_FS, MAX_SCALE, MIN_SCALE,
-                          build_target, get_filter_response, peak_gain)
+                          build_target, get_filter_response, midrange_delta,
+                          peak_gain)
 
 # The generator's module name is not importable directly (the file name has a
 # hyphen, chosen for the CLI), so load it by path the way check.py does.
@@ -124,19 +125,26 @@ def _fit(job):
             return key, {"offset": offset, "scale": scale,
                          "refused": True, "reason": str(exc)}, _curve(comp, [])
         headroom = round(-peak_gain(result['filters']) - 0.049, 1)
+        # Both figures are recomputed here rather than imported from the
+        # generator's writers, which take a formatted page rather than a
+        # dict; test_api_grid_matches_the_committed_presets is what holds
+        # the two definitions together.
+        bypass = round(headroom + midrange_delta(result['filters']), 1)
     # At the mastering reference the correction is nothing, and the fit says so
     # by returning every band at 0.00 dB. Publish that as no filters at all,
     # the way PEQ/filter_83_to_83_s1.0.md does: five pass-through biquads are
     # something a user would otherwise be asked to type in for no effect.
     if all(gain == 0.0 for _, _, gain, _ in result['filters']):
         return key, {"offset": offset, "scale": scale, "refused": False,
-                     "headroom_db": 0.0, "max_residual_db": 0.0,
+                     "headroom_db": 0.0, "bypass_headroom_db": 0.0,
+                     "max_residual_db": 0.0,
                      "target_met": True, "filters": []}, _curve(comp, [])
     return key, {
         "offset": offset,
         "scale": scale,
         "refused": False,
         "headroom_db": headroom,
+        "bypass_headroom_db": bypass,
         "max_residual_db": round(result['error'], 4),
         "target_met": bool(result['target_met']),
         "filters": [{"band": i + 1, "type": ftype, "frequency": fc,

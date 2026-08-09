@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from check import parse_markdown_filters, parse_markdown_metadata  # noqa: E402
 from iso226_utils import (  # noqa: E402
     EXTRAP_TOLERANCE_DB, VERIFY_RATES, Compensation, build_target,
-    get_filter_response, ideal_delta, loudness_delta, peak_gain,
+    get_filter_response, ideal_delta, midrange_delta, peak_gain,
 )
 
 # A hand-built result standing in for a generated one, so the format tests stay
@@ -192,10 +192,10 @@ def test_headroom_prevents_clipping_at_every_verified_rate(lf):
 
 # --- Level-matched bypass (fast) --------------------------------------------
 
-def test_bypass_headroom_is_the_headroom_plus_the_loudness_delta(lf):
+def test_bypass_headroom_is_the_headroom_plus_the_midrange_delta(lf):
     """The published figure is those two numbers and nothing else."""
     headroom = lf.headroom_adjustment(SYNTHETIC)
-    expected = headroom + loudness_delta(SYNTHETIC['filters'])
+    expected = headroom + midrange_delta(SYNTHETIC['filters'])
     assert lf.bypass_headroom(SYNTHETIC, headroom) == pytest.approx(expected, abs=0.05)
 
 
@@ -213,18 +213,23 @@ def test_bypass_headroom_never_asks_for_boost(lf):
         assert lf.bypass_headroom(result, lf.headroom_adjustment(result)) <= 0.0
 
 
-def test_bypass_attenuates_the_flat_side_when_the_preset_cuts(lf):
-    """Above the mastering reference the corrected version is the quieter one.
+def test_bypass_tracks_the_midrange_and_not_the_shelves(lf):
+    """Shelf gain outside 500 Hz-5 kHz leaves the bypass where it was.
 
-    The correction inverts, so a level-matched bypass has to come *down* to
-    meet it rather than up. Publishing an unsigned "add this much" figure would
-    be wrong for the top of the ladder.
+    Both cases below cut, as every preset above the mastering reference does,
+    and neither touches the band the ear matches on -- so there is nothing for
+    the bypass to take out and it lands on the headroom itself. A midrange
+    band is what moves it, and moves it in that band's direction.
     """
     cutting = {'filters': [('Low Shelf', 95.0, -2.5, 0.38),
                            ('High Shelf', 10070.0, -1.0, 0.76)]}
     headroom = lf.headroom_adjustment(cutting)
     assert headroom == 0.0
-    assert lf.bypass_headroom(cutting, headroom) < 0.0
+    assert lf.bypass_headroom(cutting, headroom) == pytest.approx(0.0, abs=0.05)
+
+    with_midrange = {'filters': cutting['filters'] + [('Peak', 1500.0, -2.0, 0.6)]}
+    headroom = lf.headroom_adjustment(with_midrange)
+    assert lf.bypass_headroom(with_midrange, headroom) < -0.5
 
 
 def test_markdown_publishes_the_bypass_beside_the_headroom(lf, tmp_path):
@@ -572,6 +577,16 @@ def test_api_grid_matches_the_committed_presets():
                   for f in entry["filters"]]
         assert published == served, (
             f"{stem}: PEQ/ and web/presets.json disagree. "
+            f"Rerun both regenerate.py and precompute_presets.py.")
+        # The bypass preamp is computed independently on each side, from the
+        # same filters, so it catches a level-matching change that reached one
+        # writer and not the other -- which the filter rows above cannot.
+        with open(path, encoding="utf-8") as fh:
+            match = re.search(r"bypass at\s*(-?[0-9.]+)\s*dB", fh.read())
+        expected = float(match.group(1)) if match else 0.0
+        assert entry["bypass_headroom_db"] == pytest.approx(expected, abs=1e-9), (
+            f"{stem}: PEQ/ publishes a bypass of {expected} dB and the API "
+            f"grid {entry['bypass_headroom_db']} dB. "
             f"Rerun both regenerate.py and precompute_presets.py.")
         checked += 1
     assert checked >= 10, "expected the whole committed ladder to be compared"

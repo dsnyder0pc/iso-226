@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
-import { CircleAlert, Gauge, Ruler, Sliders } from 'lucide-react';
+import { ArrowLeftRight, CircleAlert, Gauge, Ruler, Sliders } from 'lucide-react';
 
 import { isoBandHz, meta } from '../data';
 import type { ServedLevel } from '../data/types';
-import { formatOffset, publishedHz } from '../format';
+import { fixed, formatOffset, publishedHz } from '../format';
 
 interface Props {
   data: ServedLevel;
@@ -25,11 +25,16 @@ export function MetricsPanel({ data, level, reference }: Props) {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* Four across on a wide window, two by two below that. The A/B figure
+          sits third so it lands under Headroom in the 2-up layout: it is that
+          number with the midrange difference taken out, and the two are within
+          a couple of tenths of each other, which reads as a typo unless they
+          are next to each other with the note to explain it. */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           icon={<Gauge className="h-4 w-4" />}
           label="Headroom"
-          value={`${data.headroomDb.toFixed(1)} dB`}
+          value={`${fixed(data.headroomDb, 1)} dB`}
           note="Enter as preamp/headroom. Worst case across 44.1/48/96/192 kHz."
         />
         <Stat
@@ -37,6 +42,12 @@ export function MetricsPanel({ data, level, reference }: Props) {
           label="Max residual"
           value={`${data.maxResidualDb.toFixed(4)} dB`}
           note={`Worst deviation from the ISO target between ${publishedHz(isoBandHz.low)} and ${publishedHz(isoBandHz.high)} Hz.`}
+        />
+        <Stat
+          icon={<ArrowLeftRight className="h-4 w-4" />}
+          label="A/B bypass"
+          value={`${fixed(data.bypassHeadroomDb, 1)} dB`}
+          note="Apply this attenuation to the unfiltered signal to compare. Both then match in the midrange, so only the tone changes."
         />
         <Stat
           icon={<Sliders className="h-4 w-4" />}

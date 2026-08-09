@@ -190,6 +190,25 @@ def test_headroom_is_never_positive(client):
         assert payload["status"]["preset"]["headroom_db"] <= 0.0
 
 
+def test_the_bypass_preamp_is_negative_and_close_to_the_headroom(client):
+    """Both halves of that matter, and the second one is the interesting half.
+
+    It is a preamp like any other, so it cannot ask for boost. And it matches
+    the midrange, which the correction leaves alone by construction, so it has
+    to land beside the headroom rather than far from it -- a figure a decibel
+    or more away means something has gone back to weighting the whole spectrum
+    and the A/B has a level difference in it again. See the bypass invariant
+    in CLAUDE.md for what that cost the first time.
+    """
+    for offset in range(-23, 8):
+        preset = _body(client.get(f"/v1/filters?level={83 + offset}"))["status"]["preset"]
+        bypass = preset["bypass_headroom_db"]
+        assert bypass <= 0.0
+        assert abs(bypass - preset["headroom_db"]) <= 0.5, (
+            f"offset {offset:+d}: bypass {bypass} against headroom "
+            f"{preset['headroom_db']}")
+
+
 def test_the_whole_servable_range_is_actually_servable(client):
     """/v1/meta is a promise; this keeps it one."""
     low, high = _body(client.get("/v1/meta"))["coverage"]["offset_range_db"]

@@ -386,66 +386,55 @@ def peak_gain(filters, rates=VERIFY_RATES):
                for fs in rates)
 
 
-# --- Loudness matching ------------------------------------------------------
+# --- Level matching ---------------------------------------------------------
 # A compensation curve boosts the extremes and leaves 1 kHz alone, so a preset
-# and its own bypass do not play at the same loudness even on an identical
-# preamp. Comparing them as-is compares volume, and the louder of two similar
-# presentations is reliably preferred -- which would credit the filters with
-# work they are not doing. These functions size that difference so it can be
-# taken out of the comparison.
-
-# ITU-R BS.1770 K-weighting, as the two biquad stages the Recommendation
-# publishes: a high-frequency shelf and the RLB high-pass. Its coefficients are
-# specified at 48 kHz, so everything here is evaluated at that rate -- one of
-# VERIFY_RATES already. Only the magnitude response is used; no audio is
-# filtered, so there is nothing to resample.
-LOUDNESS_FS = 48000.0
-_K_SHELF = ([1.53512485958697, -2.69169618940638, 1.19839281085285],
-            [1.0, -1.69065929318241, 0.73248077421585])
-_K_RLB = ([1.0, -2.0, 1.0],
-          [1.0, -1.99004745483398, 0.99007225036621])
-
-# Pink -- equal power per octave -- stands in for musical program material.
-# The choice matters less than it looks: tilting the model spectrum from pink
-# to distinctly bass-heavy moves the answer by about half a dB, so one figure
-# per preset is publishable and per-recording matching is not needed.
-PROGRAM_SLOPE_DB_PER_OCT = -3.0
-
-
-def k_weighting_db(frequencies):
-    """ITU-R BS.1770 K-weighting magnitude, in dB, at the given frequencies."""
-    frequencies = np.asarray(frequencies, dtype=float)
-    w_eval = 2 * np.pi * frequencies / LOUDNESS_FS
-    total_h = np.ones(len(frequencies), dtype=complex)
-    for b, a in (_K_SHELF, _K_RLB):
-        _, h = freqz(b, a, worN=w_eval)
-        total_h *= h
-    return 20 * np.log10(np.abs(total_h))
+# and its own bypass need not play at the same apparent level even on an
+# identical preamp. Comparing them as-is risks comparing volume, and the louder
+# of two similar presentations is reliably preferred -- which would credit the
+# filters with work they are not doing. This function sizes that difference so
+# it can be taken out of the comparison.
+#
+# What is matched is the *midrange level*, not a broadband loudness. Until
+# 2026-08-09 this published an ITU-R BS.1770 figure, and listening tests found
+# it plainly wrong in the room: K-weighting's high-pass is only about -0.5 dB
+# at 100 Hz, so the low shelf -- +4.59 dB at 95 Hz in the 83->75 preset --
+# counted at nearly full energy value and bought the bypass 2.4 dB of credit.
+# The flat side then arrived with its midrange 2.4 dB hotter and sounded
+# obviously louder. Weighting bass at an SPL meter's valuation is the very
+# thing this project exists to correct, so the level match cannot be the one
+# place that does it; at 83->60 the same measure was 7.6 dB out.
+#
+# Matching the midrange instead leaves the boosted extremes audible, and that
+# is the point: they are the effect being demonstrated, not a confound. The
+# alternative -- equal overall loudness -- pays for them by ducking the
+# midrange, where most of the music is, which is audible in its own right and
+# partly cancels what the comparison is meant to show.
+#
+# 500 Hz - 5 kHz is the band the ear judges level over. Power is integrated
+# over log frequency, which weights every octave equally: a pink program
+# restricted to that band. (The measure this replaced applied a further
+# -3 dB/octave tilt on top of a log-frequency integral, which is not pink but
+# steeper, and tilted the answer further towards the bass still.)
+MIDBAND_LOW_HZ = 500.0
+MIDBAND_HIGH_HZ = 5000.0
 
 
-def loudness_delta(filters):
-    """How much louder a cascade plays than its own bypass, in dB.
+def midrange_delta(filters):
+    """How much louder a cascade's midrange plays than its own bypass, in dB.
 
-    The BS.1770 loudness of a modelled program spectrum with the filters
-    applied, less the same spectrum without them. Positive means the filters
-    add loudness, which is the usual case below the mastering reference; a
-    preset for a level *above* the reference cuts the extremes and returns a
-    negative figure.
+    The mean level the filters apply between MIDBAND_LOW_HZ and
+    MIDBAND_HIGH_HZ. Near zero by construction -- the compensation is 0 dB at
+    1 kHz and the correction turns upward outside this band -- so it reports
+    the small residual tilt the fitted interior peaks leave behind, typically
+    a tenth or two of a dB and negative.
 
     Both sides carry the same preamp, so the preamp cancels and only the bands
-    are measured. This is an estimate from a spectrum model rather than a
-    measurement of a recording -- good to a few tenths, which is well inside
-    what a listener can match by ear.
+    are measured.
     """
     if not filters:
         return 0.0
-    grid = np.logspace(np.log10(20.0), np.log10(20000.0), 3000)
-    program = (PROGRAM_SLOPE_DB_PER_OCT * np.log2(grid / 1000.0)
-               + k_weighting_db(grid))
-    response = get_filter_response(filters, grid, LOUDNESS_FS)
-    # Power integrated over log frequency: on a geometric grid that is what
-    # weights every octave equally, matching how the program spectrum is stated.
+    grid = np.logspace(np.log10(MIDBAND_LOW_HZ), np.log10(MIDBAND_HIGH_HZ), 1000)
+    response = get_filter_response(filters, grid)
     log_f = np.log(grid)
-    bypassed = np.trapezoid(10 ** (program / 10.0), log_f)
-    filtered = np.trapezoid(10 ** ((program + response) / 10.0), log_f)
-    return 10 * np.log10(filtered / bypassed)
+    mean_power = np.trapezoid(10 ** (response / 10.0), log_f) / (log_f[-1] - log_f[0])
+    return 10 * np.log10(mean_power)

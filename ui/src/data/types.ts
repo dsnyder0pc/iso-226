@@ -21,6 +21,7 @@ export interface PresetEntry {
   scale: number;
   refused: boolean;
   headroom_db?: number;
+  bypass_headroom_db?: number;
   max_residual_db?: number;
   target_met?: boolean;
   filters?: Filter[];
@@ -59,6 +60,13 @@ export interface ServedLevel {
   kind: 'served';
   offset: number;
   headroomDb: number;
+  /**
+   * Preamp for the same preset with its bands switched off, so an A/B changes
+   * tonal balance and not volume. Within a couple of tenths of headroomDb,
+   * because it matches the midrange and the correction leaves the midrange
+   * alone -- see the bypass invariant in CLAUDE.md.
+   */
+  bypassHeadroomDb: number;
   maxResidualDb: number;
   targetMet: boolean;
   filters: Filter[];

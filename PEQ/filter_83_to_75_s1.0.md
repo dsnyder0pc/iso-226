@@ -4,7 +4,7 @@
 
 **Headroom adjustment: -4.2 dB.** Apply this as a negative preamp / headroom setting. It is the worst case across 44.1/48/96/192 kHz.
 
-**To compare against no correction, bypass at -1.8 dB.** Make a second copy of this preset with the five bands switched off and its headroom set to -1.8 dB instead of -4.2 dB. The two then play at the same loudness (ITU-R BS.1770), so switching between them compares tonal balance and nothing else. Left on the same headroom they would differ by 2.4 dB, and the louder of two similar presentations almost always sounds better — which would tell you nothing about the filters.
+**To compare against no correction, bypass at -4.3 dB.** Make a second copy of this preset with the five bands switched off and its headroom set to -4.3 dB instead of -4.2 dB. That matches the two across 500 Hz–5 kHz, the band the ear judges level over, so switching between them compares tonal balance rather than volume — and the louder of two similar presentations almost always sounds better, which would tell you nothing about the filters. The figure lands close to the headroom above because the correction is 0 dB at 1 kHz by definition; the compensated side should still arrive fuller at the extremes, which is the whole of what you are listening for.
 
 #### 5 bands (max residual error 0.0320 dB)
 

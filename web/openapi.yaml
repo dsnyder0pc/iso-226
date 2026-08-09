@@ -42,6 +42,11 @@ info:
     must be applied as a negative preamp or gain-offset. A client that displays
     the filters without prominently displaying the headroom will cause clipping.
 
+    `status.preset.bypass_headroom_db` is the companion figure for offering an
+    A/B: the same preset with its bands switched off and that preamp in place
+    of `headroom_db` plays at the same midrange level, so the comparison is of
+    tonal balance rather than volume. It is advisory.
+
     ## Building a UI against this
 
     Call `GET /v1/meta` first. It reports `coverage.offset_range_db`, the range
@@ -131,6 +136,7 @@ paths:
                         band_count: 5
                         design_fs: 44100.0
                         headroom_db: -9.5
+                        bypass_headroom_db: -9.7
                         max_residual_db: 0.0535
                         target_met: false
                       source:
@@ -347,7 +353,8 @@ components:
                 scale: {type: number}
             preset:
               type: object
-              required: [band_count, design_fs, headroom_db, max_residual_db, target_met]
+              required: [band_count, design_fs, headroom_db, bypass_headroom_db,
+                         max_residual_db, target_met]
               properties:
                 band_count: {type: integer, examples: [5]}
                 design_fs:
@@ -362,6 +369,20 @@ components:
                     Worst case across 44.1/48/96/192 kHz. Display it as
                     prominently as the filters; omitting it causes clipping.
                   examples: [-9.5]
+                bypass_headroom_db:
+                  type: number
+                  maximum: 0
+                  description: |
+                    Preamp for a bypassed copy of this preset, in dB, so the
+                    two can be compared without one arriving louder. Same
+                    bands switched off, this figure in place of
+                    `headroom_db`. It lands within a couple of tenths of
+                    `headroom_db` because what it matches is the midrange,
+                    500 Hz - 5 kHz, which the correction leaves alone by
+                    construction. 0 when `filters` is empty. Advisory: a
+                    client that ignores it loses only the A/B, not the
+                    correction.
+                  examples: [-9.7]
                 max_residual_db:
                   type: number
                   description: >-

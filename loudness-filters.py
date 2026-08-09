@@ -28,7 +28,7 @@ from iso226_utils import (
     DEFAULT_REFERENCE, DEFAULT_SCALE, DESIGN_FS, EXTRAP_TOLERANCE_DB, ISO_FREQ,
     MAX_LEVEL, MAX_SCALE, MIN_LEVEL, MIN_REFERENCE, MAX_REFERENCE, MIN_SCALE,
     VERIFY_RATES, Compensation, build_target, get_filter_response, ideal_delta,
-    loudness_delta, peak_gain,
+    midrange_delta, peak_gain,
 )
 
 # Roon's MUSE Parametric EQ gain control spans +12 to -12 dB; miniDSP allows
@@ -388,22 +388,26 @@ def headroom_adjustment(result):
 
 
 def bypass_headroom(result, headroom):
-    """Preamp for a bypassed copy of this preset that plays equally loud.
+    """Preamp for a bypassed copy of this preset that plays at the same level.
 
     Someone hearing these filters for the first time needs something to compare
     them against, and the obvious comparison -- the same preset with the bands
-    switched off -- is not a fair one. The correction is 0 dB at 1 kHz and
-    positive either side of it, so the filtered version arrives louder, and
-    louder wins a short comparison regardless of what else is true. The figure
-    here is the published headroom plus that loudness difference, so a second
-    preset carrying it sits at the same BS.1770 loudness with only the tonal
-    balance left to judge.
+    switched off -- is only fair if the two arrive at the same level. The
+    figure here is the published headroom plus whatever the bands do to the
+    midrange, which is the band the ear judges level over, so a second preset
+    carrying it differs from this one in tonal balance and not in volume.
+
+    It lands within a couple of tenths of the headroom itself, because the
+    correction is 0 dB at 1 kHz by definition. That is the intended answer,
+    not a degenerate one: the boost the filters add outside the midrange is
+    the effect on show, and taking it back out with a global attenuation --
+    which is what matching broadband loudness does -- would hide it.
 
     Nearest 0.1 dB, unlike the headroom figure beside it, which rounds away
     from zero because it has to guarantee against clipping. This one is flat
     with a negative preamp and cannot clip, so it is free to be accurate.
     """
-    return round(headroom + loudness_delta(result['filters']), 1)
+    return round(headroom + midrange_delta(result['filters']), 1)
 
 
 def cascade_diagnostics(filters, trials=32, seed=11):
@@ -676,12 +680,15 @@ def write_markdown_table(result, comp, headroom, filename, image=None):
         "",
         f"**To compare against no correction, bypass at {bypass:.1f} dB.** Make "
         "a second copy of this preset with the five bands switched off and its "
-        f"headroom set to {bypass:.1f} dB instead of {headroom:.1f} dB. The two "
-        "then play at the same loudness (ITU-R BS.1770), so switching between "
-        "them compares tonal balance and nothing else. Left on the same "
-        f"headroom they would differ by {abs(bypass - headroom):.1f} dB, and "
-        "the louder of two similar presentations almost always sounds better — "
-        "which would tell you nothing about the filters.",
+        f"headroom set to {bypass:.1f} dB instead of {headroom:.1f} dB. That "
+        "matches the two across 500 Hz–5 kHz, the band the ear judges level "
+        "over, so switching between them compares tonal balance rather than "
+        "volume — and the louder of two similar presentations almost always "
+        "sounds better, which would tell you nothing about the filters. The "
+        "figure lands close to the headroom above because the correction is "
+        "0 dB at 1 kHz by definition; the compensated side should still arrive "
+        "fuller at the extremes, which is the whole of what you are listening "
+        "for.",
         "",
         f"#### {BAND_COUNT} bands (max residual error {result['error']:.4f} dB)",
         "",
@@ -824,7 +831,8 @@ def main():
     bypass = bypass_headroom(result, headroom)
     print(f"Headroom adjustment: {headroom:+.1f} dB. For a level-matched A/B, "
           f"bypass the bands and set headroom to {bypass:+.1f} dB "
-          f"({abs(bypass - headroom):.1f} dB of loudness difference, BS.1770).")
+          f"({abs(bypass - headroom):.1f} dB of midrange difference, "
+          "500 Hz-5 kHz).")
     diag = cascade_diagnostics(result['filters'])
     print(f"Cascade conditioning: final peak {diag['final_peak']:+.2f} dB, "
           f"worst intermediate stage {diag['stage_peak']:+.2f} dB, "

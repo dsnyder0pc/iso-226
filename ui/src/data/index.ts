@@ -129,6 +129,7 @@ function build(offset: number): LevelData {
     kind: 'served',
     offset,
     headroomDb: entry.headroom_db ?? 0,
+    bypassHeadroomDb: entry.bypass_headroom_db ?? 0,
     maxResidualDb: entry.max_residual_db ?? 0,
     targetMet: entry.target_met ?? true,
     filters: entry.filters ?? [],

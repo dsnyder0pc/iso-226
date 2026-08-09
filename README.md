@@ -542,56 +542,55 @@ That figure is:
 
 ### Hearing what the filters do — a fair comparison
 
-The obvious way to judge a preset is to switch it off and on. Done the obvious
-way, that comparison is rigged, and it is rigged in the filters' favour.
+The obvious way to judge a preset is to switch it off and on. For that to tell
+you anything, the two sides have to arrive at the same level — otherwise you are
+comparing volume, and between two similar presentations the louder one is
+reliably judged the better one, whatever else is true of it.
 
-The correction is 0 dB at 1 kHz by definition and rises either side of it, so
-with the same headroom setting on both sides the corrected version arrives
-**louder** — by 2.4 dB at 75 dB, and by 7.6 dB at 60 dB. Between two similar
-presentations, the louder one is reliably judged the better one, whatever else
-is true of it. Left uncorrected, that effect is large enough to account for the
-whole result on its own, and you would learn nothing about the filters.
+The band to match on is the **midrange, 500 Hz – 5 kHz**. That is where the ear
+judges level, and it is the one part of the spectrum the correction deliberately
+leaves alone: the compensation is 0 dB at 1 kHz by definition and turns upward
+only outside that band. So every table publishes a second number beside the
+headroom figure:
 
-Reaching for an SPL meter does not fix it either. C-weighting is nearly flat, so
+> **To compare against no correction, bypass at −4.3 dB.**
+
+Make a second preset that is identical except that the five bands are switched
+off and the headroom is set to that value instead. It will land within a couple
+of tenths of the headroom itself, which is the point rather than an anticlimax —
+there is very little to take out. Switching between the two now changes tonal
+balance and nothing else.
+
+Reaching for an SPL meter instead does not work. C-weighting is nearly flat, so
 it counts the restored bass energy that your ears, at this level, do not — the
-corrected preset will read higher on the meter even when the two are perceptually
+corrected preset reads higher on the meter even when the two are perceptually
 matched. The meter is the right tool for finding your `--level` and the wrong
 one for this.
 
-So every table publishes a second number beside the headroom figure:
+**This repository got that wrong once, and it is worth knowing why.** Until
+August 2026 the published figure matched *broadband loudness* instead, measured
+as [ITU-R BS.1770](#references) — the standard behind LUFS volume levelling. On
+that measure the 75 dB preset appears to add 2.4 dB and the 60 dB preset 7.6 dB,
+so the bypass was told to attenuate the flat side by that much. In the room it
+was obvious within seconds: the flat side came back distinctly louder. The
+reason is the same one this whole project exists for. BS.1770's weighting curve
+is barely down half a dB at 100 Hz, so it counts restored bass at nearly full
+value; your ears at 75 dB do not. It is C-weighting's mistake wearing a
+broadcast standard's clothes, and it left the corrected side's midrange 2.4 dB
+down — well past the roughly 1 dB where a midrange level difference becomes
+plainly audible.
 
-> **To compare against no correction, bypass at −1.8 dB.**
-
-Make a second preset that is identical except that the five bands are switched
-off and the headroom is set to that value instead. Switching between the two
-now changes tonal balance and nothing else.
-
-That figure is the published headroom plus the loudness the bands add, measured
-as **[ITU-R BS.1770](#references) integrated loudness** — the same standard
-streaming services use to level-match tracks — over a pink program spectrum. Two
-things follow from having modelled the program rather than measured your
-recording:
-
-* **One number per preset is enough.** Tilting the model spectrum from pink to
-  distinctly bass-heavy moves the answer by about half a dB, so the figure does
-  not need to be quoted per recording.
-* **It is an estimate, good to a few tenths.** That is well inside what anyone
-  can match by ear, but if you want the exact figure for one track, render it
-  through both chains and measure with `ffmpeg -af ebur128`.
+Matching the midrange rather than the loudness has a consequence worth stating
+plainly: the corrected side really is a little louder overall, because restored
+bass and treble *is* added energy. That is not a confound left in by accident —
+it is the effect on show. Cancelling it with a broadband attenuation would hide
+the very thing you are listening for, and would do it by ducking the midrange,
+where most of the music lives.
 
 Above your mastering reference the correction inverts — it cuts the extremes
-rather than boosting them — so the corrected version is the *quieter* one and
-the published bypass figure attenuates the flat side to meet it. The arithmetic
-is the same; only the sign changes.
-
-One caveat worth stating plainly, because it cuts against the number above.
-Matching the loudness deliberately removes part of what the filters do: restored
-bass and treble *is* added loudness, and a broadband gain that cancels it
-cancels some of the effect along with the confound. That is the right trade —
-what these filters claim to fix is spectral balance, not level, and that is what
-the matched comparison isolates. But it means a level-matched A/B understates
-the difference you will hear in ordinary listening, where no one is holding the
-loudness constant.
+rather than boosting them — so the corrected version is the quieter one overall.
+Its midrange still sits where it always did, so the bypass figure still tracks
+the headroom; only the tonal balance changes direction.
 
 ### Gain limits on real hardware
 
@@ -655,7 +654,7 @@ two decimals even though its values look small.
 
 ### Quiet — 65 dB
 
-**Headroom adjustment `-9.5 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-3.7 dB` · max residual error **0.0533 dB**
+**Headroom adjustment `-9.5 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-9.7 dB` · max residual error **0.0535 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
@@ -670,7 +669,7 @@ two decimals even though its values look small.
 
 ### Moderate — 75 dB
 
-**Headroom adjustment `-4.2 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-1.8 dB` · max residual error **0.0311 dB**
+**Headroom adjustment `-4.2 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-4.3 dB` · max residual error **0.0320 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
@@ -687,7 +686,7 @@ two decimals even though its values look small.
 
 Above the 83 dB reference, so the correction is a slight *cut* at the extremes.
 
-**Headroom adjustment `-0.1 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-0.6 dB` · max residual error **0.0162 dB**
+**Headroom adjustment `-0.1 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-0.1 dB` · max residual error **0.0171 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
@@ -1057,7 +1056,8 @@ it](https://www.iso.org/standard/83117.html).
   idea as `--reference`, in coarse 5 dB steps.
   [Dynamic EQ and Reference Level](https://ask.audyssey.com/hc/en-us/articles/212347383-Dynamic-EQ-and-Reference-Level)
 * **ITU-R BS.1770** / **EBU R128** — loudness measurement underlying LUFS-based
-  volume leveling.
+  volume leveling. Used here only as a cautionary example: see
+  [a fair comparison](#hearing-what-the-filters-do--a-fair-comparison).
 * **Room EQ Wizard documentation.**
   [REW Help](https://www.roomeqwizard.com/help/help/html/eqwindow.html)
 * **Roon Labs Knowledge Base** — DSP engine, Parametric EQ and Headroom

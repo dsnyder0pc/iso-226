@@ -22,8 +22,8 @@ import iso226_utils  # noqa: E402
 from iso226_utils import (  # noqa: E402
     ALPHA_R, ANNEX_B_TOLERANCE_DB, ISO226_PHON_MAX, ISO226_PHON_MIN, ISO_AF,
     ISO_FREQ, ISO_TF, REF_1KHZ_INDEX, T_R, VERIFY_RATES, Compensation,
-    get_filter_response, ideal_delta, iso226_spl, k_weighting_db,
-    loudness_delta, peak_gain,
+    MIDBAND_HIGH_HZ, MIDBAND_LOW_HZ, get_filter_response, ideal_delta,
+    iso226_spl, midrange_delta, peak_gain,
 )
 
 
@@ -299,65 +299,52 @@ def test_peak_gain_covers_every_verified_rate():
         assert np.max(get_filter_response(filters, grid, rate)) <= worst + 1e-9
 
 
-# --- Loudness matching ------------------------------------------------------
+# --- Level matching ---------------------------------------------------------
 
-def test_k_weighting_matches_the_bs1770_calibration_point():
-    """BS.1770 fixes the gain at 997 Hz, so this is an external anchor.
+def test_midrange_delta_is_zero_for_a_transparent_cascade():
+    """No gain anywhere means no level difference to correct for."""
+    assert midrange_delta([]) == 0.0
+    assert midrange_delta([('Peak', 1000.0, 0.0, 1.0)]) == pytest.approx(0.0, abs=1e-9)
 
-    The Recommendation calibrates its loudness scale with a -0.691 dB offset,
-    chosen so a 997 Hz sine at 0 dBFS reads -3.01 LKFS. That is only true if
-    the weighting itself contributes exactly +0.691 dB there. Like the Annex B
-    check above, this compares against a published number rather than against
-    anything the repository computes.
+
+def test_midrange_delta_barely_moves_for_the_shelves_alone():
+    """The shelves are outside the band being matched, and must stay there.
+
+    This is the regression the published figure was got wrong on. A broadband
+    loudness measure credited the 83->75 shelves below with 2.4 dB, and the
+    83->60 pair with 7.6 dB, so the bypass was told to attenuate the flat side
+    by that much; in the room the flat side then arrived audibly louder,
+    because what the ear matched on was the midrange, where these contribute
+    almost nothing. Any future re-weighting has to keep that true.
     """
-    assert k_weighting_db(np.array([997.0]))[0] == pytest.approx(0.691, abs=5e-4)
+    for shelves in ([('Low Shelf', 95.0, 4.59, 0.38),
+                     ('High Shelf', 10070.0, 1.55, 0.76)],
+                    [('Low Shelf', 41.39, 12.0, 0.54),
+                     ('High Shelf', 10150.0, 3.81, 0.89)]):
+        assert abs(midrange_delta(shelves)) < 0.15
 
 
-def test_k_weighting_has_its_shelf_and_its_highpass():
-    """The two stages are a ~+4 dB HF shelf and a high-pass below ~100 Hz."""
-    shelf = k_weighting_db(np.array([8000.0, 16000.0]))
-    assert shelf == pytest.approx([4.0, 4.0], abs=0.15)
-    assert k_weighting_db(np.array([40.0]))[0] < -4.0
-    assert k_weighting_db(np.array([20.0]))[0] < k_weighting_db(np.array([40.0]))[0]
-
-
-def test_loudness_delta_is_zero_for_a_transparent_cascade():
-    """No gain anywhere means no loudness difference to correct for."""
-    assert loudness_delta([]) == 0.0
-    assert loudness_delta([('Peak', 1000.0, 0.0, 1.0)]) == pytest.approx(0.0, abs=1e-9)
-
-
-def test_loudness_delta_follows_the_direction_of_the_correction():
-    """Boosting the extremes adds loudness; cutting them removes it."""
-    boost = [('Low Shelf', 95.0, 4.59, 0.38), ('High Shelf', 10070.0, 1.55, 0.76)]
+def test_midrange_delta_follows_a_band_inside_the_matched_range():
+    """What does move it is gain in the band itself, in the obvious direction."""
+    boost = [('Peak', 1500.0, 3.0, 0.7)]
     cut = [(t, f, -g, q) for t, f, g, q in boost]
-    assert loudness_delta(boost) > 0.5
-    assert loudness_delta(cut) < -0.5
+    assert midrange_delta(boost) > 1.0
+    assert midrange_delta(cut) < -1.0
 
 
-def test_loudness_delta_never_exceeds_the_peak_gain():
-    """A weighted average of the response cannot outrun its maximum.
+def test_midrange_delta_stays_within_the_response_it_averages():
+    """A mean cannot escape the range of what it averages.
 
-    This is what guarantees the published bypass preamp stays negative: it is
-    the headroom figure plus this delta, and the headroom already covers the
-    peak. Without it a preset could advertise a bypass that asks for boost.
+    The upper half of that is what guarantees the published bypass preamp
+    stays negative: it is the headroom figure plus this delta, and the
+    headroom already covers the peak. Without it a preset could advertise a
+    bypass that asks for boost.
     """
+    grid = np.logspace(np.log10(MIDBAND_LOW_HZ), np.log10(MIDBAND_HIGH_HZ), 200)
     for filters in ([('Low Shelf', 41.39, 12.0, 0.54), ('Peak', 120.0, 5.94, 0.25),
                      ('High Shelf', 10150.0, 3.81, 0.89)],
                     [('Peak', 500.0, 6.0, 0.5)],
                     [('High Shelf', 8000.0, 9.0, 0.7)]):
-        assert loudness_delta(filters) <= peak_gain(filters) + 1e-9
-
-
-def test_loudness_delta_is_insensitive_to_the_program_spectrum(monkeypatch):
-    """One figure per preset only holds if the model spectrum barely matters.
-
-    Pink is the published assumption. Tilting it a further 1.5 dB/octave
-    towards the bass -- well past any real recording -- must not move the
-    answer by more than a few tenths, or the number would have to be quoted
-    per recording instead of per preset.
-    """
-    filters = [('Low Shelf', 95.0, 4.59, 0.38), ('High Shelf', 10070.0, 1.55, 0.76)]
-    pink = loudness_delta(filters)
-    monkeypatch.setattr(iso226_utils, 'PROGRAM_SLOPE_DB_PER_OCT', -4.5)
-    assert loudness_delta(filters) == pytest.approx(pink, abs=0.6)
+        in_band = get_filter_response(filters, grid)
+        assert np.min(in_band) - 1e-9 <= midrange_delta(filters) <= np.max(in_band) + 1e-9
+        assert midrange_delta(filters) <= peak_gain(filters) + 1e-9

@@ -441,6 +441,22 @@ lives in `regenerate.py` — so this applies to anything new.)
   every table, config, figure and README value, and pushes 60 dB over the
   12 dB budget so the documented floor moves to 61 dB. The filters themselves
   would not change.
+- **The published bypass matches the midrange, not broadband loudness.**
+  `midrange_delta` averages the cascade over 500 Hz–5 kHz and nothing else,
+  so `bypass_headroom` lands within a couple of tenths of the headroom itself.
+  That looks like a null result and is not one. This shipped an ITU-R BS.1770
+  figure until 2026-08-09; listening tests on 83→75 in Roon found the flat
+  side obviously louder, and the arithmetic agrees — K-weighting is barely
+  0.5 dB down at 100 Hz, so it valued the +4.59 dB low shelf at nearly full
+  energy and credited the bypass 2.4 dB, leaving the compensated side's
+  midrange that far down. At 83→60 it was 7.6 dB. **Weighting bass the way an
+  SPL meter does is the error this project exists to correct, so the level
+  match cannot be the one place that commits it.** Do not reintroduce a
+  broadband measure: matching overall loudness pays for the restored extremes
+  by ducking the midrange, which cancels part of the effect being
+  demonstrated. `test_midrange_delta_barely_moves_for_the_shelves_alone` is
+  the regression guard. (An ISO-226-weighted middle option was costed at the
+  same time — +0.81 dB at 75, +1.87 at 60 — and rejected for that reason.)
 - **Out-of-band regions are constrained, not optimized.** Keep the target
   flat-held below 20 Hz and above 12.5 kHz with `EXTRAP_TOLERANCE_DB`; this is
   what keeps subsonic gain bounded.

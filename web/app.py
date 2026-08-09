@@ -289,6 +289,7 @@ def filters():
                 "band_count": DATA["band_count"],
                 "design_fs": DATA["design_fs"],
                 "headroom_db": entry["headroom_db"],
+                "bypass_headroom_db": entry["bypass_headroom_db"],
                 "max_residual_db": entry["max_residual_db"],
                 "target_met": entry["target_met"],
             },
