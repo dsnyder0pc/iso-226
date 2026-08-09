@@ -170,9 +170,8 @@ function NoCorrectionNeeded() {
         ideal correction is 0.00 dB at every frequency.{' '}
         <strong className="text-slate-200">Apply no filters and no headroom
         adjustment.</strong>{' '}
-        If a preset from another listening level is loaded, disable it — reaching
-        for the nearest rung instead would apply about 1.6 dB of correction you do
-        not want.
+        If a preset from another listening level is loaded, disable it — it
+        corrects for a level you are not listening at.
       </p>
     </section>
   );
