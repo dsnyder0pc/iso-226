@@ -6,7 +6,13 @@
   --color-inset: #161b2e;
   --color-line: #1e293b;
   --color-accent: #818cf8;
-  --color-target: #94a3b8;
+  /* Warm, and deliberately nowhere near the accent. The target used to be a
+     blue-grey (#94a3b8) drawn thick behind an indigo response, and a reviewer
+     reported the two as hard to tell apart — same family of hue, and only a
+     doubling in width between them. Hue now carries the distinction and width
+     reinforces it, so the pairing survives a small screen and a colour-blind
+     reader, neither of whom can rely on width alone. */
+  --color-target: #fbbf24;
 }
 
 /* Nothing on this page is set below `text-sm` (14px), and running prose is

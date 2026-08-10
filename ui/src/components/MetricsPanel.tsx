@@ -57,12 +57,9 @@ export function MetricsPanel({ data, level, reference }: Props) {
         />
       </div>
 
-      <p className="rounded-2xl border border-slate-800/80 bg-ink p-4 text-base leading-relaxed text-slate-400">
-        The residual is measured on the <strong className="text-slate-200">published,
-        rounded</strong> values in the table below — not on an unrounded fit behind
-        them — and on the filter cascade alone, before the headroom adjustment.
-      </p>
-
+      {/* The note on how the residual is measured used to sit here, which put
+          the stat grid between the residual figure and its own explanation.
+          It now lives under that figure. */}
       {!data.targetMet && (
         <p className="flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-base leading-relaxed text-amber-200">
           <CircleAlert className="mt-1 h-4 w-4 shrink-0" />

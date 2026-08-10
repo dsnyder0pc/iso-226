@@ -5,7 +5,7 @@ import { Header } from './components/Header';
 import { LevelControls } from './components/LevelControls';
 import { MetricsPanel } from './components/MetricsPanel';
 import { FilterTable } from './components/FilterTable';
-import { ResponsePlot } from './components/ResponsePlot';
+import { Plots } from './components/Plots';
 import { RefusalNotice } from './components/RefusalNotice';
 import { ExportPanel } from './components/ExportPanel';
 import { useAudioPreview } from './audio/useAudioPreview';
@@ -116,9 +116,9 @@ export default function App() {
           }}
         />
 
-        {/* The plot is told what is audible, not which buttons are pressed:
+        {/* The plots are told what is audible, not which buttons are pressed:
             "bypassed" only means anything while something is playing. */}
-        <ResponsePlot
+        <Plots
           data={data}
           hearing={
             !preview.playing ? null : preview.bypassed ? 'flat' : 'compensated'

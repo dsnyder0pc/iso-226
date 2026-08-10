@@ -34,16 +34,15 @@ export function displayShift(data: LevelData): number {
 }
 
 export const WIDTH = 1000;
-export const MARGIN = { left: 58, right: 18, top: 14, bottom: 26 };
-export const MAIN_HEIGHT = 300;
-export const GAP = 38;
-export const RESIDUAL_HEIGHT = 92;
-export const HEIGHT =
-  MARGIN.top + MAIN_HEIGHT + GAP + RESIDUAL_HEIGHT + MARGIN.bottom;
+export const MARGIN = { left: 58, right: 18, top: 14 };
+
+/** Room under a panel for its own row of frequency labels. */
+const AXIS_HEIGHT = 26;
+
+const RESPONSE_HEIGHT = 300;
+const RESIDUAL_HEIGHT = 110;
 
 const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
-const MAIN_TOP = MARGIN.top;
-const RESIDUAL_TOP = MARGIN.top + MAIN_HEIGHT + GAP;
 
 /**
  * The window is 20 Hz-20 kHz, matching the figures in `images/` that the PEQ
@@ -134,20 +133,39 @@ export const RESIDUAL_BOUND = Math.max(0.05, roundedTo(span.residual * 1.15, 0.0
 
 export function yOfGain(db: number): number {
   const [low, high] = GAIN_RANGE;
-  return MAIN_TOP + ((high - db) / (high - low)) * MAIN_HEIGHT;
+  return MARGIN.top + ((high - db) / (high - low)) * RESPONSE_HEIGHT;
 }
 
 export function yOfResidual(db: number): number {
   const t = (RESIDUAL_BOUND - db) / (2 * RESIDUAL_BOUND);
-  return RESIDUAL_TOP + t * RESIDUAL_HEIGHT;
+  return MARGIN.top + t * RESIDUAL_HEIGHT;
 }
 
-export const panels = {
-  main: { top: MAIN_TOP, height: MAIN_HEIGHT, bottom: MAIN_TOP + MAIN_HEIGHT },
+/**
+ * The two figures, each its own `<svg>` with its own frequency axis.
+ *
+ * They were one figure with a shared axis until a reviewer read them as a
+ * single graph with a confusing legend: two vertical scales, two meanings of
+ * "dB", and the only frequency labels on the page sitting under the lower of
+ * them, so reading a feature off the response meant tracking down two panels.
+ * Separate figures cost one repeated axis and settle all of that.
+ *
+ * What they still share is `xOf`: same width, same margins, same log mapping,
+ * so the panels stack in register and a frequency is at the same place on the
+ * page in both. The crosshair is shared for the same reason — see `Plots`.
+ */
+export const frames = {
+  response: {
+    top: MARGIN.top,
+    height: RESPONSE_HEIGHT,
+    bottom: MARGIN.top + RESPONSE_HEIGHT,
+    viewHeight: MARGIN.top + RESPONSE_HEIGHT + AXIS_HEIGHT,
+  },
   residual: {
-    top: RESIDUAL_TOP,
+    top: MARGIN.top,
     height: RESIDUAL_HEIGHT,
-    bottom: RESIDUAL_TOP + RESIDUAL_HEIGHT,
+    bottom: MARGIN.top + RESIDUAL_HEIGHT,
+    viewHeight: MARGIN.top + RESIDUAL_HEIGHT + AXIS_HEIGHT,
   },
   left: MARGIN.left,
   right: MARGIN.left + PLOT_WIDTH,

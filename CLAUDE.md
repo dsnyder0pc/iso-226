@@ -247,14 +247,40 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     touched — the residual is still computed over the optimizer's own slice.
     What it stops showing is the sub-20 Hz overshoot described under the
     headroom invariant below; that is deliberate and matches `images/`.
-  - **The response panel adds the headroom; the residual panel must not.**
-    Both traces on the upper panel are drawn with the preamp applied, against
+  - **The response and the residual are two figures, not two panels of one.**
+    Separate cards, separate `<svg>`s, each with its own vertical scale, its
+    own frequency axis and its own legend — `ResponsePlot.tsx` and
+    `ResidualPlot.tsx`, with the chrome they share in `PlotParts.tsx`. They
+    were stacked under a single axis and a single legend until a reviewer read
+    the pair as one graph: two meanings of "dB" under one key list, and the
+    only frequency labels on the page sitting beneath the *lower* figure, so
+    identifying a feature on the response meant tracking down past the
+    residual to find out what frequency it was at. What the two still share is
+    `xOf` — same viewBox width, same margins, same log mapping, so the cards
+    stack in register — and the crosshair, which `Plots.tsx` owns for that
+    reason. The hover index lives in `Plots` and not in `App` so that a
+    pointer crossing a figure re-renders two figures and not the metrics, the
+    filter table and the export panel below them. The note explaining that the
+    residual is measured on the published, rounded values moved out of
+    `MetricsPanel` at the same time: it was describing a figure two panels
+    away, with the stat grid in between.
+  - **The ISO target is warm; everything in the response family is cool.**
+    `--color-target` is amber (#fbbf24), not the blue-grey it was — the same
+    reviewer could not reliably separate a thick #94a3b8 target from a #818cf8
+    response, which is one hue family distinguished only by a doubling in
+    width. Hue now carries it and width reinforces it, which is what a small
+    screen and a red-green-blind reader need. Per-band traces are dashed for
+    the same reason: they are components of the response, so they stay in the
+    accent colour and separate on dash instead. The residual figure's ±max
+    lines went slate when amber moved, so amber means one thing per page.
+  - **The response figure adds the headroom; the residual figure must not.**
+    Both traces on the response are drawn with the preamp applied, against
     a 0 dBFS clipping line and a dotted flat reference, exactly as
     `plot_frequency_response` draws the figures in `images/`. This is not
     cosmetic: without it a compensation curve sits almost entirely *above*
     zero and reads as a proposal to boost and clip, when what it asks for is
     attenuation everywhere except the extremes. The residual is the difference
-    of two curves, so the preamp cancels out of it — shifting that panel too
+    of two curves, so the preamp cancels out of it — shifting that figure too
     would be wrong, and the published `max_residual_db` is measured on the
     cascade alone. Per-band traces are drawn from the flat reference, so a
     band's distance from that line is its contribution and those distances
