@@ -394,46 +394,27 @@ def peak_gain(filters, rates=VERIFY_RATES):
 # filters with work they are not doing. This function sizes that difference so
 # it can be taken out of the comparison.
 #
-# The measure is the cascade's own gain at MATCH_FREQ_HZ: draw a flat line
-# across the published response and read off where it crosses. That is a
-# rule of thumb, arrived at by listening, and it is labelled as one here
-# because two better-motivated models were tried first and both failed.
+# The measure is the cascade's own gain at MATCH_FREQ_HZ, the normalization
+# frequency -- the one point the whole project defines the compensation to be
+# 0 dB at. Matching there says only that the two sides of an A/B should have
+# identical *midrange*, and lets the restored bass and treble be the entire
+# audible difference.
 #
-# ITU-R BS.1770 was first, and was wrong by a wide margin. K-weighting
-# discounts 100 Hz by only 1.8 dB against 1 kHz where the ear at 75 phon
-# discounts it by 14.0 dB, so the low shelf -- +4.59 dB at 95 Hz in the
-# 83->75 preset -- counted at nearly full energy value and bought the bypass
-# 2.4 dB of credit, 7.6 dB at 83->60. Weighting bass at an SPL meter's
-# valuation is the thing this project exists to correct.
+# That is deliberately the weakest claim available. Stronger ones have been
+# tried and withdrawn after listening: any measure that weighs the restored
+# extremes -- BS.1770, a C-weighted meter, an ISO 226-weighted integral, or a
+# match below the midrange -- over-credits the bass relative to what the ear
+# does at these levels, and gives the flat side a level advantage that decides
+# the comparison before tonal balance gets a say. See the bypass invariant in
+# CLAUDE.md if you are about to re-derive one of them.
 #
-# A midrange power average over 500 Hz - 5 kHz replaced it and was also
-# wrong, in the opposite direction and by less: it credits the restored
-# extremes with nothing at all, and in the room the compensated side still
-# read as slightly larger in scale.
-#
-# An ISO 226-weighted integral -- the project's own contours, at the actual
-# playback level -- was the third candidate and the most principled. It
-# over-credits the bass: it predicted +0.81 dB at 83->75 against +0.50
-# measured, and +1.59 at 83->65 against a confirmed +1.05. It also requires
-# the effective frequency to move with level (360 Hz at 75, 397 at 65) and
-# the measurements do not support that.
-#
-# What is left is a single point on the response, and the evidence for it is
-# one ear-derived null plus one confirmed prediction:
-#
-#   83->75, found by ear: -3.7 dB against a -4.2 dB headroom. Inverting that
-#           +0.50 dB against the published cascade gives 487 Hz.
-#   83->65, predicted -8.46 dB from this rule and confirmed indistinguishable
-#           in the room. The ISO-weighted candidate predicted -7.91, half a
-#           decibel away, and half a decibel was audible in the 75 dB test.
-#
-# 500 Hz rather than 487 because two data points do not earn three
-# significant figures, and 500 sits inside the frequency band each
-# measurement is consistent with (462-514 Hz at 75, 476-498 at 65).
-#
-# This wants a listening panel and does not have one. Treat the figure as
-# calibrated, not derived, and do not give it more precision than that.
-MATCH_FREQ_HZ = 500.0
+# Note this does not read exactly zero. It is the *cascade's* gain, not the
+# target's, so it picks up however far five bands miss 0 dB at 1 kHz: under
+# 0.07 dB everywhere except 83->60, the loosest preset in the set, at
+# -0.205 dB. That is not error leaking in -- if the compensated side really
+# does play 0.2 dB quiet at 1 kHz, matching there means attenuating the flat
+# side to meet it.
+MATCH_FREQ_HZ = float(ISO_FREQ[REF_1KHZ_INDEX])
 
 # Below this, the bypass and the headroom are the same setting to a listener,
 # so callers publish one number instead of two near-identical ones. Level
@@ -444,15 +425,15 @@ MATCH_NEGLIGIBLE_DB = 0.2
 def match_delta(filters):
     """How much louder a cascade plays than its own bypass, in dB.
 
-    The cascade's gain at MATCH_FREQ_HZ, which is where a flat line drawn
-    across the published response crosses it. Positive below the mastering
-    reference, where the correction lifts the extremes; negative above it,
-    where it cuts them and the compensated side is the quieter one.
+    The cascade's gain at MATCH_FREQ_HZ, the normalization frequency. Since
+    the compensation is defined to be 0 dB there, this is small by
+    construction -- it is whatever is left of the fit's own miss at 1 kHz --
+    and `bypass_headroom` collapses it onto the headroom below
+    MATCH_NEGLIGIBLE_DB, which is almost everywhere.
 
     Read from the published filters rather than the ideal target, because
-    those are what a listener actually plays. The two differ by at most
-    0.14 dB, at 60 dB where the fit is loosest, and by 0.02 dB or less
-    everywhere else.
+    those are what a listener actually plays: matching a listener's A/B
+    against a curve nobody can load would be matching the wrong thing.
 
     Both sides carry the same preamp, so the preamp cancels and only the
     bands are measured.

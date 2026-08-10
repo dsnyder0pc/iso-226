@@ -165,13 +165,13 @@ export function useAudioPreview() {
    * Take the filters out of the path, and move the preamp to the published
    * bypass figure as they go.
    *
-   * That second half is what makes this a comparison rather than a volume
-   * change, and it used to be missing: the preamp stayed put on the theory
-   * that the compensation is 0 dB at 1 kHz, so the midrange would hold still
-   * by itself. Listening says otherwise -- flat at the same preamp reads
-   * about half a decibel smaller in scale at 75 dB and more than a decibel
-   * smaller at 60 -- which is the whole reason `bypass_headroom_db` exists.
-   * Using it here makes the page's own A/B the one the tables describe.
+   * The A/B is matched at 1 kHz, where the compensation is 0 dB by
+   * definition, so that figure is the headroom itself at every rung but the
+   * loosest -- the preamp does hold still and the bands are the whole change.
+   * Read it from the data anyway rather than reusing `headroomDb`: it
+   * already differs at 83->60, and it is the field a future revision of the
+   * match would arrive in. The page must follow the tables, never a rule
+   * inlined here.
    */
   const setBypass = useCallback((next: boolean) => {
     setBypassed(next);

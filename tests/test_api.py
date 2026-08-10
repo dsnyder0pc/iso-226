@@ -193,19 +193,21 @@ def test_headroom_is_never_positive(client):
 def test_the_bypass_preamp_is_negative_and_near_the_headroom(client):
     """Both halves of that matter, and the second one is the interesting half.
 
-    It is a preamp like any other, so it cannot ask for boost. And it is the
-    headroom plus the cascade's gain at 500 Hz, which the gain ceiling keeps
-    small -- 1.2 dB at the deepest rung and under half a decibel over most of
-    the ladder. The bound below is loose enough to allow that and tight enough
-    to catch a return to broadband loudness weighting, which asked for 2.4 dB
-    at 83->75 and 7.6 dB at 83->60. See the bypass invariant in CLAUDE.md for
-    what that cost the first time.
+    It is a preamp like any other, so it cannot ask for boost. And since the
+    A/B is matched at 1 kHz -- where the compensation is 0 dB by definition --
+    it can only differ from the headroom by however far the fitted cascade
+    misses 0 dB there, which is 0.2 dB at the loosest rung and nothing at all
+    at the other thirty.
+
+    The bound is therefore tight on purpose: it is what catches a return to
+    weighting the restored extremes, which every withdrawn rule did and which
+    asked for as much as 7.6 dB. See the bypass invariant in CLAUDE.md.
     """
     for offset in range(-23, 8):
         preset = _body(client.get(f"/v1/filters?level={83 + offset}"))["status"]["preset"]
         bypass = preset["bypass_headroom_db"]
         assert bypass <= 0.0
-        assert abs(bypass - preset["headroom_db"]) <= 2.0, (
+        assert abs(bypass - preset["headroom_db"]) <= 0.3, (
             f"offset {offset:+d}: bypass {bypass} against headroom "
             f"{preset['headroom_db']}")
 

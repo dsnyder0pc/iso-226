@@ -1,5 +1,5 @@
 {
- "generated_utc": "2026-08-09T20:23:56+00:00",
+ "generated_utc": "2026-08-09T23:37:45+00:00",
  "iso_edition": "ISO 226:2023",
  "band_count": 5,
  "design_fs": 44100.0,
@@ -167,7 +167,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -0.2,
-   "bypass_headroom_db": -0.4,
+   "bypass_headroom_db": -0.2,
    "max_residual_db": 0.031,
    "target_met": true,
    "filters": [
@@ -213,7 +213,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -0.2,
-   "bypass_headroom_db": -0.5,
+   "bypass_headroom_db": -0.2,
    "max_residual_db": 0.0479,
    "target_met": true,
    "filters": [
@@ -259,7 +259,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -0.3,
-   "bypass_headroom_db": -0.7,
+   "bypass_headroom_db": -0.3,
    "max_residual_db": 0.0229,
    "target_met": true,
    "filters": [
@@ -305,7 +305,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -0.3,
-   "bypass_headroom_db": -0.7,
+   "bypass_headroom_db": -0.3,
    "max_residual_db": 0.0242,
    "target_met": true,
    "filters": [
@@ -351,7 +351,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -5.3,
-   "bypass_headroom_db": -4.7,
+   "bypass_headroom_db": -5.3,
    "max_residual_db": 0.0452,
    "target_met": true,
    "filters": [
@@ -397,7 +397,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -5.8,
-   "bypass_headroom_db": -5.1,
+   "bypass_headroom_db": -5.8,
    "max_residual_db": 0.043,
    "target_met": true,
    "filters": [
@@ -443,7 +443,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -6.3,
-   "bypass_headroom_db": -5.6,
+   "bypass_headroom_db": -6.3,
    "max_residual_db": 0.0486,
    "target_met": true,
    "filters": [
@@ -489,7 +489,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -6.9,
-   "bypass_headroom_db": -6.1,
+   "bypass_headroom_db": -6.9,
    "max_residual_db": 0.0469,
    "target_met": true,
    "filters": [
@@ -535,7 +535,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -7.4,
-   "bypass_headroom_db": -6.6,
+   "bypass_headroom_db": -7.4,
    "max_residual_db": 0.0513,
    "target_met": false,
    "filters": [
@@ -581,7 +581,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -7.9,
-   "bypass_headroom_db": -7.0,
+   "bypass_headroom_db": -7.9,
    "max_residual_db": 0.0417,
    "target_met": true,
    "filters": [
@@ -627,7 +627,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -8.4,
-   "bypass_headroom_db": -7.4,
+   "bypass_headroom_db": -8.4,
    "max_residual_db": 0.0534,
    "target_met": false,
    "filters": [
@@ -673,7 +673,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -9.0,
-   "bypass_headroom_db": -8.0,
+   "bypass_headroom_db": -9.0,
    "max_residual_db": 0.053,
    "target_met": false,
    "filters": [
@@ -719,7 +719,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -9.5,
-   "bypass_headroom_db": -8.5,
+   "bypass_headroom_db": -9.5,
    "max_residual_db": 0.0535,
    "target_met": false,
    "filters": [
@@ -765,7 +765,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -10.0,
-   "bypass_headroom_db": -8.9,
+   "bypass_headroom_db": -10.0,
    "max_residual_db": 0.0571,
    "target_met": false,
    "filters": [
@@ -857,7 +857,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -10.5,
-   "bypass_headroom_db": -9.3,
+   "bypass_headroom_db": -10.5,
    "max_residual_db": 0.0624,
    "target_met": false,
    "filters": [
@@ -903,7 +903,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -11.0,
-   "bypass_headroom_db": -9.8,
+   "bypass_headroom_db": -11.0,
    "max_residual_db": 0.0925,
    "target_met": false,
    "filters": [
@@ -949,7 +949,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -11.4,
-   "bypass_headroom_db": -10.2,
+   "bypass_headroom_db": -11.4,
    "max_residual_db": 0.1755,
    "target_met": false,
    "filters": [
@@ -995,7 +995,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -11.9,
-   "bypass_headroom_db": -10.7,
+   "bypass_headroom_db": -12.1,
    "max_residual_db": 0.2083,
    "target_met": false,
    "filters": [
@@ -1157,7 +1157,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -2.1,
-   "bypass_headroom_db": -1.8,
+   "bypass_headroom_db": -2.1,
    "max_residual_db": 0.0271,
    "target_met": true,
    "filters": [
@@ -1203,7 +1203,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -2.7,
-   "bypass_headroom_db": -2.4,
+   "bypass_headroom_db": -2.7,
    "max_residual_db": 0.0216,
    "target_met": true,
    "filters": [
@@ -1249,7 +1249,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -3.2,
-   "bypass_headroom_db": -2.8,
+   "bypass_headroom_db": -3.2,
    "max_residual_db": 0.0284,
    "target_met": true,
    "filters": [
@@ -1295,7 +1295,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -3.7,
-   "bypass_headroom_db": -3.3,
+   "bypass_headroom_db": -3.7,
    "max_residual_db": 0.0271,
    "target_met": true,
    "filters": [
@@ -1341,7 +1341,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -4.2,
-   "bypass_headroom_db": -3.7,
+   "bypass_headroom_db": -4.2,
    "max_residual_db": 0.032,
    "target_met": true,
    "filters": [
@@ -1387,7 +1387,7 @@
    "scale": 1.0,
    "refused": false,
    "headroom_db": -4.8,
-   "bypass_headroom_db": -4.3,
+   "bypass_headroom_db": -4.8,
    "max_residual_db": 0.0265,
    "target_met": true,
    "filters": [

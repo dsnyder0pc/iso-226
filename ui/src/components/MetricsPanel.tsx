@@ -26,10 +26,10 @@ export function MetricsPanel({ data, level, reference }: Props) {
       </div>
 
       {/* Four across on a wide window, two by two below that. The A/B figure
-          sits third so it lands under Headroom in the 2-up layout: it is that
-          number with the midrange difference taken out, and the two are within
-          a couple of tenths of each other, which reads as a typo unless they
-          are next to each other with the note to explain it. */}
+          sits third so it lands under Headroom in the 2-up layout: matched at
+          1 kHz the two are the *same number* at every rung but the loosest,
+          which reads as a duplicate unless they sit together with the note
+          explaining that one is for the filtered side and one for the flat. */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
           icon={<Gauge className="h-4 w-4" />}
@@ -47,7 +47,7 @@ export function MetricsPanel({ data, level, reference }: Props) {
           icon={<ArrowLeftRight className="h-4 w-4" />}
           label="A/B bypass"
           value={`${fixed(data.bypassHeadroomDb, 1)} dB`}
-          note="Apply this attenuation to the unfiltered signal to compare. Both then sound the same size, so only the tone changes."
+          note="Play the unfiltered signal at this gain to compare. Matched at 1 kHz, so the midrange holds still and only the extremes change."
         />
         <Stat
           icon={<Sliders className="h-4 w-4" />}

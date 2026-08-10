@@ -317,22 +317,50 @@ def test_match_delta_reads_the_cascade_at_the_match_frequency():
     filters = [('Low Shelf', 95.0, 4.59, 0.38), ('Peak', 320.8, 0.35, 0.25),
                ('Peak', 898.9, -0.13, 0.42), ('Peak', 2919.0, -0.33, 0.25),
                ('High Shelf', 10070.0, 1.55, 0.76)]
-    at_500 = get_filter_response(filters, np.array([MATCH_FREQ_HZ]))[0]
-    assert match_delta(filters) == pytest.approx(at_500, abs=1e-12)
+    at_match = get_filter_response(filters, np.array([MATCH_FREQ_HZ]))[0]
+    assert match_delta(filters) == pytest.approx(at_match, abs=1e-12)
 
 
-def test_match_delta_reproduces_the_measured_null():
-    """The one ear-derived calibration point this rule rests on.
+def test_the_match_frequency_is_the_normalization_frequency():
+    """The A/B is matched at the point the compensation is defined to be 0 dB.
 
-    83->75 nulled by ear at -3.7 dB against a -4.2 dB headroom, so the bands
-    are worth +0.5 dB. Any redefinition of the measure has to still land
-    there, because that measurement is the whole justification for the
-    frequency -- see the level-matching note in iso226_utils.
+    Not a nearby round number that happens to sit close to it: `ideal_delta`
+    normalizes every contour difference at ISO_FREQ[REF_1KHZ_INDEX], and the
+    bypass matches the two sides there, so the restored bass and treble are
+    the entire audible difference between them. Asserted as the identity
+    rather than as `== 1000.0` so the two cannot drift apart.
+
+    Earlier rules matched elsewhere and were withdrawn after listening; see
+    the level-matching note in iso226_utils before changing this.
+    """
+    assert MATCH_FREQ_HZ == ISO_FREQ[REF_1KHZ_INDEX]
+
+
+def test_match_delta_is_negligible_for_a_typical_published_set():
+    """Matching at the normalization frequency leaves almost nothing to correct.
+
+    Well under the threshold at which `bypass_headroom` publishes a single
+    number for both sides, which is the case for all but the loosest fit.
     """
     published_75 = [('Low Shelf', 95.0, 4.59, 0.38), ('Peak', 320.8, 0.35, 0.25),
                     ('Peak', 898.9, -0.13, 0.42), ('Peak', 2919.0, -0.33, 0.25),
                     ('High Shelf', 10070.0, 1.55, 0.76)]
-    assert match_delta(published_75) == pytest.approx(0.50, abs=0.05)
+    assert abs(match_delta(published_75)) < MATCH_NEGLIGIBLE_DB
+
+
+def test_match_delta_still_reads_the_cascade_and_not_the_target():
+    """The measure is the filters' gain at 1 kHz, not the target's zero.
+
+    The target is 0 dB there by construction; the published cascade is only
+    as close as five bands get. 83->60 is the loosest fit in the set and
+    misses by 0.205 dB, which is the one committed preset whose bypass does
+    not collapse onto its headroom. A "simplification" that returned zero
+    would pass every other test in this group and silently drop that.
+    """
+    published_60 = [('Low Shelf', 41.39, 12.0, 0.54), ('Peak', 120.0, 5.94, 0.25),
+                    ('Peak', 450.0, -1.83, 0.35), ('Peak', 3436.0, -0.92, 1.07),
+                    ('High Shelf', 10150.0, 3.81, 0.89)]
+    assert abs(match_delta(published_60)) > MATCH_NEGLIGIBLE_DB
 
 
 def test_match_delta_follows_the_direction_of_the_correction():

@@ -298,17 +298,19 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     and not with the type scale — it is still 10–11 units and does shrink on a
     narrow window.
   - **The preview's bypass removes the bands and moves the preamp to
-    `bypassHeadroomDb`.** The second half is what makes it a comparison
-    instead of a volume change, and it was missing until 2026-08-09: the
-    preamp used to stay put, on the theory that the compensation is 0 dB at
-    1 kHz so the midrange would hold still by itself. Listening says
-    otherwise — flat at the same preamp reads about 0.5 dB smaller in scale at
-    75 dB and 1.2 dB smaller at 60 — which is what the published bypass figure
-    is for, so the page's own A/B now uses it. `update` reads the bypass flag
-    off the graph rather than React state, because a stale closure there would
-    drag the slider's gain onto the wrong side of the comparison. The plot's
-    dotted flat line stays at the preamp: it is the datum the per-band traces
-    are measured from, and 0.5 dB is invisible on that scale anyway. The graph
+    `bypassHeadroomDb`.** Which, since the A/B is matched at 1 kHz, is the
+    same number as `headroomDb` at every rung but 83→60 — so in practice the
+    preamp now stays put and the bands are the whole change. **Do not
+    "simplify" this to reading `headroomDb`.** The page must publish whatever
+    the generator published, and this field is where a future revision of the
+    match would arrive; hard-coding the identity would silently ignore it, and
+    would already be wrong at 83→60. This went the other way once: a 500 Hz
+    match shipped on 2026-08-09 making the two differ by 0.3–1.2 dB down the
+    ladder, and was falsified the same day — see the bypass invariant below.
+    `update` reads the bypass flag off the graph rather than React state,
+    because a stale closure there would drag the slider's gain onto the wrong
+    side of the comparison. The plot's dotted flat line stays at the preamp:
+    it is the datum the per-band traces are measured from. The graph
     allocates one biquad per published band up front rather than one per
     filter, so the slider can move between any two levels — including onto the
     pass-through rung, which has no filters — without a rebuild. An unused
@@ -474,33 +476,34 @@ lives in `regenerate.py` — so this applies to anything new.)
   every table, config, figure and README value, and pushes 60 dB over the
   12 dB budget so the documented floor moves to 61 dB. The filters themselves
   would not change.
-- **The published bypass is a rule of thumb, and it is labelled as one.**
-  `match_delta` reads the published cascade at `MATCH_FREQ_HZ` (500 Hz) and
-  nothing else; `bypass_headroom` adds that to the headroom, or returns the
-  headroom unchanged when the two are within `MATCH_NEGLIGIBLE_DB` (0.2).
-  **Do not promote it to a derived quantity.** The evidence is one ear-derived
-  null (83→75 at −3.7 dB against a −4.2 dB headroom, which inverts to 487 Hz)
-  and one confirmed prediction (83→65 at −8.5 dB). One listener, one room.
-  Three better-motivated measures were tried and failed, and the failures are
-  the reason this looks unprincipled: ITU-R BS.1770 credited the bypass 2.4 dB
-  at 83→75 and 7.6 dB at 83→60 because K-weighting discounts 100 Hz by 1.8 dB
-  against 1 kHz where the ear at 75 phon discounts it by 14.0 dB — an SPL
-  meter's valuation of bass inside the tool built to correct exactly that; a
-  midrange average over 500 Hz–5 kHz credited the restored extremes with
-  nothing, and read as too small; an ISO 226-weighted integral over-credited
-  the bass (+0.81 dB predicted against +0.50 measured) and requires the
-  effective frequency to move with level, which the measurements do not
-  support. `test_match_delta_reproduces_the_measured_null` pins the one number
-  this rests on -- it is a fixture guarding against accidental change, not an
-  invitation to retune. **Checked at 65 and 75 dB, which bracket where most
-  listening happens.** The untested rungs are the cheap ones: taking
-  disagreement with the ISO-weighted measure as a rough bound, exposure is
-  0.63 dB at 60 dB, 0.34 at 75, a minimum of 0.12 at 85, then back up to 0.38
-  at 89 as the inverted correction deepens -- so it is *not* monotonic above
-  the reference. The worst case sits at the bottom of the ladder, where a
-  listener discriminates level least well. Absent a revised ISO 226 or
-  published work from a Harman-scale listening programme, this measure is
-  settled; do not re-derive it from theory, because theory lost three times.
+- **The A/B bypass is matched at 1 kHz. Do not re-derive it; theory has lost
+  four times.** `MATCH_FREQ_HZ` is `ISO_FREQ[REF_1KHZ_INDEX]` — written as that
+  identity, not `1000.0`, because the claim is precisely *match where the
+  compensation is defined to be 0 dB*. `match_delta` reads the published
+  cascade there; `bypass_headroom` adds it to the headroom, or returns the
+  headroom unchanged within `MATCH_NEGLIGIBLE_DB` (0.2), which is what happens
+  for 30 of the 31 servable presets. **In effect the bypass preamp is the
+  headroom preamp**, and the machinery survives to express *why* and to carry
+  the one exception: 83→60, the loosest fit, misses 0 dB at 1 kHz by −0.205 dB
+  and publishes −12.1 against a −11.9 headroom. That is not fit error leaking
+  in — if the compensated side really plays 0.2 dB quiet at 1 kHz, matching
+  there means attenuating the flat side to meet it.
+
+  **The durable finding is the direction of the error, not the frequency.**
+  Four stronger rules shipped or were costed and every one *over*-credited the
+  restored bass; none under-credited it. BS.1770 asked for 2.4 dB at 83→75 and
+  7.6 dB at 83→60; an ISO 226-weighted integral for +0.81 dB at 83→75; a
+  500 Hz match for 0.3–1.2 dB down the ladder, and that one was falsified in
+  blind listening by a second listener, who preferred the *flat* side at both
+  78 and 75 dB for exactly as long as it carried the credit. Matching at the
+  response trough or below fails the other way and hands the compensated side
+  the advantage. The tests holding this are
+  `test_the_match_frequency_is_the_normalization_frequency` and
+  `test_match_delta_still_reads_the_cascade_and_not_the_target`, the latter
+  standing on the 83→60 values in `tests/test_generator.py::LOOSEST` — without
+  it a `match_delta` hard-coded to zero would pass everything else. The owner
+  wants this left alone to soak; the narrative was deliberately trimmed out of
+  the README and the code comments, so this bullet is the surviving record.
 - **Out-of-band regions are constrained, not optimized.** Keep the target
   flat-held below 20 Hz and above 12.5 kHz with `EXTRAP_TOLERANCE_DB`; this is
   what keeps subsonic gain bounded.

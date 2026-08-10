@@ -379,10 +379,11 @@ questions — so it is worth knowing that one holds the loudness still and the
 other does not.
 
 - **Filters on / off, at one level.** This one is level-matched: the bypass takes
-  the bands out and moves the preamp to the published bypass figure, so the two
-  sides sound the same size and only the tonal balance moves. It is the same
-  comparison the tables describe, run for you. This is the A/B for *what a given
-  preset does*.
+  the bands out and sets the preamp to the published bypass figure, which — since
+  the two sides are matched at 1 kHz — is the same preamp for all but the deepest
+  preset. The midrange holds still, the extremes are the whole change. It is the
+  same comparison the tables describe, run for you. This is the A/B for *what a
+  given preset does*.
 - **Moving the level slider while it plays.** This one gets quieter as you head
   down the ladder, and that is the honest answer rather than a fault. A quieter
   listening level needs a deeper correction, a deeper correction boosts the
@@ -549,7 +550,7 @@ reliably judged the better one, whatever else is true of it.
 
 So every table publishes a second number beside the headroom figure:
 
-> **To compare against no correction, play the unfiltered signal at −3.7 dB.**
+> **To compare against no correction, play the unfiltered signal at −4.2 dB.**
 
 How you apply that attenuation varies from one DSP to the next, so the tables
 name the figure and leave the method to your player's documentation. In Roon it
@@ -557,74 +558,41 @@ can be a second preset with the bands switched off, or a Procedural EQ block
 carrying only the gain; in miniDSP or a WiiM it is an input trim; JRiver,
 HQPlayer and Audirvana each have their own place for a flat attenuation.
 
-The figure is the headroom plus **the cascade's own gain at 500 Hz** — draw a
-flat line across the response plot in this repository and read off where it
-crosses. Near the mastering reference that gain falls under 0.2 dB, below what
-anyone can hear, and the table publishes the headroom figure unchanged rather
-than two numbers a tenth apart.
+**The rule is: match the two sides at 1 kHz.** That is the frequency the whole
+compensation is defined against — every curve here is 0 dB there by
+construction — so matching there sets the midrange identical on both sides and
+lets the restored bass and treble be the entire audible difference. In practice
+the bypass figure *is* the headroom figure: 30 of the 31 presets print one
+number for both. The exception is 83→60, the loosest fit in the set, where five
+bands miss 0 dB at 1 kHz by 0.2 dB and the bypass carries that difference.
 
-**It is a rule of thumb, calibrated by listening.** It is not derived from
-anything, and the honest evidence for it is one measurement and one successful
-prediction. At 83→75 the null was found by ear — same preamp on both sides
-read as slightly *smaller* in scale, a decibel less attenuation was too much,
-and −3.7 dB was indistinguishable. Inverting that +0.5 dB against the published
-response gives 487 Hz, and 500 is the round number nearest it. At 83→65 the
-rule then *predicted* −8.5 dB, which proved indistinguishable in the same room.
-That is a single listener in a single system, so if your own ears want a
-different number, they are the better authority.
+This is deliberately the weakest claim available. It says only that two things
+set to the same midrange level sound like the same size, and asserts nothing
+about how much loudness restored bass is worth. It also means the arithmetic
+does not change above your mastering reference, where the correction inverts and
+cuts the extremes instead of boosting them — the midrange is 0 dB either way.
 
-**Where it is trusted, and how far.** 65 and 75 dB are the two rungs it has
-been checked at, and they bracket the range most listening happens in. The
-untested rungs are also the cheapest ones to be wrong about. Taking the
-disagreement with the nearest rival measure as a rough bound, the figure could
-plausibly be out by 0.6 dB at 60 dB, 0.3 dB at 75, and 0.1 dB at 85 — and the
-worst of that sits at the bottom of the ladder, where a listener is least able
-to hear a level difference anyway because everything is closer to the room's
-noise floor. It grows again above 85 as the inverted correction deepens,
-reaching about 0.4 dB at 89 dB. Nowhere is it large enough to change which
-preset you would choose.
+**Do not try to improve on it with a loudness meter.** Both of the obvious
+tools count restored bass at close to full energy value where your ears, at
+these levels, do not: BS.1770 discounts 100 Hz by 1.8 dB relative to 1 kHz
+where your hearing at 75 dB discounts it by 14.0 dB, and a C-weighted SPL meter
+is flatter still. Either one reads the corrected side as louder when the two are
+perceptually matched, and correcting for that reading ducks the midrange and
+cancels part of the effect you are trying to hear. The meter is the right tool
+for finding your `--level` and the wrong one for this. An earlier version of
+this project matched on BS.1770 and withdrew it after listening.
 
-#### Three models that failed first
+One consequence worth stating plainly: matched this way the corrected side still
+carries more *energy*, because restored bass and treble is real added output.
+What the match removes is the size difference, so what survives is the tonal
+difference — which is the thing on show.
 
-All three are worth recording, because each is the obvious thing to reach for
-and each is more principled than the rule that beat it.
-
-**ITU-R BS.1770**, the standard behind LUFS volume levelling, was wrong by a
-wide margin. On that measure the 75 dB preset appears to add 2.4 dB and the
-60 dB preset 7.6 dB, so the bypass was told to attenuate the flat side by that
-much — and in the room the flat side came back distinctly louder within
-seconds. The reason is the same one this project exists for: BS.1770's
-weighting curve discounts 100 Hz by 1.8 dB relative to 1 kHz, where your ears
-at 75 dB discount it by 14.0 dB. It counts restored bass at very nearly full
-value and they do not. C-weighting's mistake wearing a broadcast standard's
-clothes.
-
-**A midrange average over 500 Hz – 5 kHz** replaced it, and was wrong in the
-other direction: it credits the restored extremes with nothing at all, and the
-compensated side still read as slightly larger in scale.
-
-An **ISO 226-weighted integral** — this project's own contours, evaluated at
-the actual playback level — was the most principled candidate and still
-over-credits the bass, predicting +0.81 dB at 83→75 where +0.50 was measured.
-It also requires the effective frequency to move with level, and the
-measurements do not support that.
-
-Reaching for an SPL meter instead does not work either. C-weighting is nearly
-flat, so it counts the restored bass energy that your ears, at this level, do
-not — the corrected preset reads higher on the meter even when the two are
-perceptually matched. The meter is the right tool for finding your `--level`
-and the wrong one for this.
-
-One consequence worth stating plainly: the corrected side still carries more
-*energy*, because restored bass and treble is real added output. Matched this
-way the two sound the same size, which is the confound worth removing — what
-survives is the tonal difference, which is the thing on show.
-
-Above your mastering reference the correction inverts. It cuts the extremes
-rather than boosting them, so the compensated side is the quieter of the two
-and the flat side needs *more* attenuation than the headroom rather than less:
-at 89 dB the figure is −0.7 dB against a −0.3 dB headroom. Same rule, same
-arithmetic, opposite sign.
+**How much to trust it.** Two listeners, in two rooms; this wants a proper
+listening panel and does not have one. The most useful check so far was blind:
+three tracks each at 78 and 75 dB, same 90 seconds, order randomised, one
+listener asked nothing more than which he enjoyed more. With both sides at the
+same attenuation he consistently preferred the compensated one. If your own ears
+want a different number, they are the better authority.
 
 ### Gain limits on real hardware
 
@@ -688,7 +656,7 @@ two decimals even though its values look small.
 
 ### Quiet — 65 dB
 
-**Headroom adjustment `-9.5 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-8.5 dB` · max residual error **0.0535 dB**
+**Headroom adjustment `-9.5 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-9.5 dB` · max residual error **0.0535 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |
@@ -703,7 +671,7 @@ two decimals even though its values look small.
 
 ### Moderate — 75 dB
 
-**Headroom adjustment `-4.2 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-3.7 dB` · max residual error **0.0320 dB**
+**Headroom adjustment `-4.2 dB`** · [level-matched bypass](#hearing-what-the-filters-do--a-fair-comparison) `-4.2 dB` · max residual error **0.0320 dB**
 
 | Band | Type | Frequency (Hz) | Gain (dB) | Q |
 | :--- | :--- | :--- | :--- | :--- |

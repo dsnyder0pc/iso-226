@@ -62,9 +62,10 @@ export interface ServedLevel {
   headroomDb: number;
   /**
    * Preamp for the same preset with its bands switched off, so an A/B changes
-   * tonal balance and not volume. headroomDb plus the cascade's gain at
-   * 500 Hz, and exactly headroomDb near the mastering reference where that is
-   * under 0.2 dB -- see the bypass invariant in CLAUDE.md.
+   * tonal balance and not volume. The two sides are matched at 1 kHz, where
+   * the compensation is 0 dB by definition, so this is headroomDb itself
+   * everywhere except the loosest fit in the ladder -- see the bypass
+   * invariant in CLAUDE.md.
    */
   bypassHeadroomDb: number;
   maxResidualDb: number;

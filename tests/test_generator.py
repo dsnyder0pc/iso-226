@@ -48,6 +48,21 @@ SYNTHETIC = {
     'target_met': True,
 }
 
+# The one committed preset whose bypass does not collapse onto its headroom.
+# Real published values from 83->60, the loosest fit in the set: five bands
+# miss 0 dB at the normalization frequency by 0.205 dB there, a hair past
+# MATCH_NEGLIGIBLE_DB. Everything else in the ladder is inside 0.07 dB and
+# snaps, so this is the only data the non-snapping branch has -- keep it in
+# step with PEQ/filter_83_to_60_s1.0.md.
+LOOSEST = {
+    'filters': [('Low Shelf', 41.39, 12.0, 0.54), ('Peak', 120.0, 5.94, 0.25),
+                ('Peak', 450.0, -1.83, 0.35), ('Peak', 3436.0, -0.92, 1.07),
+                ('High Shelf', 10150.0, 3.81, 0.89)],
+    'error': 0.2083,
+    'restarts': 24,
+    'target_met': False,
+}
+
 
 # --- Format round-trips (fast) ----------------------------------------------
 
@@ -200,10 +215,16 @@ def test_headroom_prevents_clipping_at_every_verified_rate(lf):
 # --- Level-matched bypass (fast) --------------------------------------------
 
 def test_bypass_headroom_is_the_headroom_plus_the_match_delta(lf):
-    """The published figure is those two numbers and nothing else."""
-    headroom = lf.headroom_adjustment(SYNTHETIC)
-    expected = headroom + match_delta(SYNTHETIC['filters'])
-    assert lf.bypass_headroom(SYNTHETIC, headroom) == pytest.approx(expected, abs=0.05)
+    """The published figure is those two numbers and nothing else.
+
+    Measured on LOOSEST rather than SYNTHETIC: matching at the normalization
+    frequency puts almost every cascade under MATCH_NEGLIGIBLE_DB, where the
+    snap below takes over and this sum is no longer what is published. Run on
+    a snapping cascade the assertion passes for the wrong reason.
+    """
+    headroom = lf.headroom_adjustment(LOOSEST)
+    expected = headroom + match_delta(LOOSEST['filters'])
+    assert lf.bypass_headroom(LOOSEST, headroom) == pytest.approx(expected, abs=0.05)
 
 
 def test_bypass_headroom_never_asks_for_boost(lf):
@@ -223,18 +244,24 @@ def test_bypass_headroom_never_asks_for_boost(lf):
 def test_bypass_snaps_to_the_headroom_when_the_difference_is_inaudible(lf):
     """Two numbers a tenth apart invite a distinction nobody can hear.
 
-    Near the mastering reference the correction barely moves the level, so
-    the bypass collapses onto the headroom rather than publishing -1.4 dB
-    beside -1.6 dB. Away from it the two must stay apart.
+    Matching at the normalization frequency, this is the usual case rather
+    than the exception -- a compensation curve is 0 dB at 1 kHz by design, so
+    a bypass matched there is the headroom itself for all but the loosest
+    fits, and the tables print one number.
+
+    LOOSEST is the counter-example that keeps the branch honest: 83->60 is
+    the one committed preset that misses 1 kHz by more than the threshold.
+    Without it this test would pass against a `bypass_headroom` that ignored
+    `match_delta` entirely.
     """
     tiny = {'filters': [('Low Shelf', 60.0, 0.4, 0.4)]}
     headroom = lf.headroom_adjustment(tiny)
     assert abs(match_delta(tiny['filters'])) < MATCH_NEGLIGIBLE_DB
     assert lf.bypass_headroom(tiny, headroom) == headroom
 
-    real = {'filters': [('Low Shelf', 95.0, 4.59, 0.38)]}
-    headroom = lf.headroom_adjustment(real)
-    assert lf.bypass_headroom(real, headroom) != headroom
+    headroom = lf.headroom_adjustment(LOOSEST)
+    assert abs(match_delta(LOOSEST['filters'])) > MATCH_NEGLIGIBLE_DB
+    assert lf.bypass_headroom(LOOSEST, headroom) != headroom
 
 
 def test_markdown_publishes_the_bypass_beside_the_headroom(lf, tmp_path):

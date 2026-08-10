@@ -47,8 +47,9 @@ info:
     the filtered signal played at `headroom_db`, so a listener switching
     between them compares tonal balance rather than volume. How a client
     applies it is up to the client — a second preset, a flat filter, an input
-    trim. It is advisory, and it is a rule of thumb calibrated by listening
-    rather than a derived quantity.
+    trim. It is advisory. The two sides are matched at 1 kHz, the frequency
+    the compensation is defined to be 0 dB at, so for almost every preset this
+    figure is `headroom_db` itself.
 
     ## Building a UI against this
 
@@ -139,7 +140,7 @@ paths:
                         band_count: 5
                         design_fs: 44100.0
                         headroom_db: -9.5
-                        bypass_headroom_db: -8.5
+                        bypass_headroom_db: -9.5
                         max_residual_db: 0.0535
                         target_met: false
                       source:
@@ -378,14 +379,16 @@ components:
                   description: |
                     Gain, in dB, at which the **unfiltered** signal sounds the
                     same size as this filter set does at `headroom_db` — the
-                    figure to offer for an A/B against no correction. It is
-                    `headroom_db` plus the cascade's own gain at 500 Hz, and
-                    it is **equal to `headroom_db`** near the mastering
-                    reference, where that gain is under 0.2 dB and the
-                    distinction is below audibility. 0 when `filters` is
+                    figure to offer for an A/B against no correction. The
+                    two sides are matched at 1 kHz, where the compensation is
+                    0 dB by definition, so this is `headroom_db` plus however
+                    far the fitted cascade misses 0 dB there. That miss is
+                    under 0.2 dB for every preset but the loosest, so this is
+                    **usually equal to `headroom_db`**; treat a difference as
+                    the exception rather than the rule. 0 when `filters` is
                     empty. Advisory: ignoring it loses only the A/B, not the
                     correction.
-                  examples: [-8.5]
+                  examples: [-9.5]
                 max_residual_db:
                   type: number
                   description: >-

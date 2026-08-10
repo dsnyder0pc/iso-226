@@ -416,18 +416,24 @@ def bypass_headroom(result, headroom):
 def _bypass_gap_note(bypass, headroom):
     """The sentence relating the published bypass figure to the headroom.
 
-    Preset-specific, because near the mastering reference the two collapse to
-    one number and the page should say so rather than leave a reader hunting
-    for a difference that was rounded away.
+    Preset-specific, because for almost every preset the two collapse to one
+    number and the page should say so rather than leave a reader hunting for a
+    difference that was rounded away.
+
+    The collapsed branch must not explain itself by nearness to the mastering
+    reference. Matching at 1 kHz, the collapse is the compensation being 0 dB
+    there by definition, which is equally true at 62 dB and at 82.
     """
     gap = abs(bypass - headroom)
     if gap < 0.05:
-        return ("That is the headroom figure above, unchanged: this close to "
-                "the mastering reference the correction moves the level by "
-                "less than anyone can hear, so one setting serves both sides.")
-    return (f"It sits {gap:.1f} dB from the headroom above, which is the "
-            "level the bands add back at 500 Hz — near enough to read off "
-            "the response plot yourself.")
+        return ("That is the headroom figure above, unchanged. The two sides "
+                "are matched at 1 kHz, where this correction is 0 dB by "
+                "definition, so one setting serves both and the difference "
+                "you are listening for is entirely at the extremes.")
+    return (f"It sits {gap:.1f} dB from the headroom above, which is how far "
+            "this set misses 0 dB at 1 kHz — the point the two sides are "
+            "matched at, and the only preset in the ladder where the miss is "
+            "large enough to be worth a separate number.")
 
 
 def cascade_diagnostics(filters, trials=32, seed=11):
@@ -707,8 +713,9 @@ def write_markdown_table(result, comp, headroom, filename, image=None):
         "compares tonal balance rather than volume — and the louder of two "
         "similar presentations almost always sounds better, which would tell "
         f"you nothing about the filters. {_bypass_gap_note(bypass, headroom)} "
-        "It is a rule of thumb calibrated by listening rather than a derived "
-        "quantity; if your own ears want a slightly different number, they "
+        "Matching at 1 kHz is a judgement calibrated by listening rather than "
+        "a result derived from a loudness model; if your "
+        "own ears want a slightly different number, they "
         "are the better authority. The compensated side should still arrive "
         "fuller at the extremes, which is the whole of what you are "
         "listening for.",
