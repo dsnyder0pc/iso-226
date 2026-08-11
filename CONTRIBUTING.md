@@ -258,7 +258,9 @@ is essentially no excuse for a finding at that level.
 [CLAUDE.md](CLAUDE.md) carries the working notes: what each module does, the
 invariants that must not be broken, and the domain facts worth knowing before
 changing the math. It is written for an AI coding assistant, but it is the most
-complete description of the design and is worth reading first.
+complete description of the design and is worth reading first. Two subdirectories
+carry their own: [ui/CLAUDE.md](ui/CLAUDE.md) for the browser page and
+[tests/CLAUDE.md](tests/CLAUDE.md) for the suite.
 
 Two things there that most often catch people out:
 

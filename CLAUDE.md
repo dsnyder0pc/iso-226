@@ -11,61 +11,13 @@ listening rooms.
 
 ## Commands
 
-Full developer setup is in `CONTRIBUTING.md`; this is the short form.
+Every command lives in `CONTRIBUTING.md` — setup, the ISO data files, the
+generator, the tests, the linters, the UI build. Do not restate them here. Two
+things that section does not say:
 
-```bash
-pip install -r requirements.txt
-
-# Required before anything runs — see "ISO data" below
-cp tests/iso226_table1.py.example reference/iso226_table1.py   # then populate it
-
-# Generate filter_<ref>_to_<level>_s<scale>.{md,yml,png} in the working
-# directory. The generator writes nowhere else -- see "Output layout" below.
-python loudness-filters.py --level <db> [--reference <db>] [--scale <0.1-1.0>]
-
-# Verify published values against the ideal target; writes a dual-trace error plot
-python check.py --level <db> [--reference <db>] [--scale <s>]
-
-# Regression tests — run after touching any math
-python -m pytest tests/                  # all 175 (~30 s)
-python -m pytest tests/ -m "not slow"    # 164 fast ones (~1 s)
-
-# Rebuild every committed preset and figure (several minutes)
-python regenerate.py
-python regenerate.py --list              # what would be generated, without doing it
-
-# Refit web/presets.json + web/curves.json (~40 min on four cores)
-python precompute_presets.py
-
-# Linters — both must be clean before committing
-python -m pylint check.py loudness-filters.py iso226_utils.py \
-    regenerate.py precompute_presets.py web/app.py tests/
-shellcheck -S style path/to/script.sh    # any Bash added to the repo
-
-# The browser UI (needs Node; nothing that serves it does)
-cd ui && npm install && npm run verify && npm run build
-```
-
-`regenerate.py` is the single source of truth for which presets ship — the
-`LADDER` and `FEATURED` lists in that file, not the contents of `PEQ/`
-or `REW/`.
-Run it after any change to the math, the optimizer or the coefficients, then
-reconcile the README, which quotes headroom values, residual errors and filter
-tables.
-
-Tests marked `slow` share one session-scoped `preset` fixture that runs the
-optimizer once (~30 s) and assert many shipped properties against it. Add new
-integration assertions to that fixture rather than generating another preset.
-
-A generator run takes 20–45 s (constrained minimax, multistart). Runtime is
-data-dependent now: the search stops when it reaches its target, stagnates, or
-hits `MAX_RESTARTS`, so a hard level like 62 dB costs twice an easy one. Batch
-regeneration of the whole ladder is ~5.5 minutes — run it in the background.
-
-`precompute_presets.py` is a different order of cost: 35 grid points, of which
-the four refusals and the extremes of the ladder exhaust all 24 restarts.
-Measured at ~40 minutes on four workers, not the ~6 the preset count suggests.
-Always background it. The fit is seeded (`seed=3`), so a rerun reproduces the
+**Run the long ones in the background.** `regenerate.py` is ~5.5 minutes and
+`precompute_presets.py` ~40 minutes; both will outlast a foreground call. The
+fit is seeded (`seed=3`), so a rerun of `precompute_presets.py` reproduces the
 committed filters exactly — a refit that changes a single published value means
 the maths changed, and the diff is the evidence.
 
@@ -181,195 +133,16 @@ Running scripts from elsewhere gives `ModuleNotFoundError: No module named
     same rule the CLI's `suggest_alternatives` follows.
 
 - **`ui/`** — the static browser page. Vite + React + TypeScript, no backend.
-  - **The plot grid *is* the design grid.** `web/curves.json` samples on
-    `np.concatenate(design_grid())` — the 182 points the optimizer fitted
-    against, 10 Hz–20 kHz. That identity is load-bearing three times over: the
-    stored target is `build_target(comp).target` including its flat-held
-    extrapolation, so the page can show the held regions instead of cropping
-    them; `in_band` is the same slice the objective minimizes over, so the
-    residual the curves imply *is* the published `max_residual_db` rather than
-    something near it; and there is no second definition of where the ISO data
-    stops. Do not resample it onto a rounder grid for the plot.
-  - **No DSP in the browser.** Bands are stored separately and summed in
-    JavaScript — magnitudes multiply, so decibels add, and the sum is the
-    cascade response exactly (checked to 5e-15). The page adds decibels and
-    subtracts a target; it evaluates no biquads. This is deliberate: the RBJ
-    coefficients already shipped a sign error once, and a second implementation
-    of them in another language is a second place for that to happen. The
-    predecessor of this UI drew a *fabricated* target — `response + sin(...)` —
-    which no test could have caught, because nothing tied its picture to the
-    numbers. `tests/test_curves.py` is that tie.
-  - **`ui/` imports `web/*.json`; it must never hold a copy.** The prototype
-    kept a byte-identical duplicate of `presets.json` in its own tree.
-    `test_the_ui_keeps_no_copy_of_the_generated_data` forbids it.
-  - `src/export/formats.ts` is the one place the UI reimplements a repository
-    format rather than reading one, so `npm run check:exports` diffs its
-    CamillaDSP output against every committed `REW/*.yml`. It is an npm script,
-    not a pytest test, for the same reason Flask is absent from the root
-    `requirements.txt`: the Python suite must not require a JavaScript
-    toolchain. The pass-through preset is skipped there — `REW/` ships five
-    zero-gain bands so the file stays a loadable config, while the API
-    publishes it as no filters at all.
-  - **JavaScript prints a negative zero without its sign.** `(-0).toFixed(1)`
-    is `"0.0"`, where Python gives `-0.0`, and three committed configs carry a
-    band that rounds a hair below zero. `fixed()` in `src/format.ts` puts the
-    sign back; every gain and Q in every emitter goes through it. A Python
-    emulation of the emitter matched all 13 files and missed this — only
-    running the real thing found it.
-  - **Refusal messages name a level twice**, the one that failed and the one to
-    try instead, so `parseRefusal` reads only the text after `Try one of:`.
-    Reading the first match offered the user 58 dB as the way out of 58 dB
-    being unavailable. `npm run check:suggestions` is the UI's copy of
-    `test_every_suggested_level_can_actually_be_served`; `src/data/refusal.ts`
-    is import-free so that script can run it under Node.
-  - **The page does not work from `file://`** — the entry is an ES module and
-    browsers block those from a null origin, so it renders blank. Verified, not
-    assumed. Any static server works, including `npm run preview`. What gets
-    deployed is `ui/dist/`, never `ui/`: the source `index.html` is Vite's dev
-    entry and points at `/src/main.tsx`.
-  - **Deep links use `?level=` and `?reference=`** — the API's parameter names,
-    with the API's meanings, so a shared link translates to a curl command by
-    inspection. Not the offset, even though the offset is what keys the data:
-    sending it would re-target a shared link at the recipient's reference
-    instead of the sender's. A bad parameter falls back to the default per
-    field and is never clamped, because showing a different level from the one
-    the link names is worse than ignoring the link. `src/url.ts` is import-free
-    so `npm run check:share-links` can round-trip it under Node.
-  - Both vertical scales on the plot are fixed across the whole ladder rather
-    than fitted to the level on screen, so dragging the slider shows the
-    correction growing and the residual worsening at the quiet end. 60 dB
-    *looking* worse than 70 dB is the point.
-  - **The view is 20 Hz–20 kHz; the data is not.** The window matches the
-    figures in `images/` that the PEQ tables embed, so a listener comparing
-    the page against a preset's own plot sees the same picture. It crops
-    exactly at `in_band`, whose first index is 20 Hz to within 4e-15, so the
-    sub-20 Hz extrapolation block comes off whole and nothing measured is
-    touched — the residual is still computed over the optimizer's own slice.
-    What it stops showing is the sub-20 Hz overshoot described under the
-    headroom invariant below; that is deliberate and matches `images/`.
-  - **The response and the residual are two figures, not two panels of one.**
-    Separate cards, separate `<svg>`s, each with its own vertical scale, its
-    own frequency axis and its own legend — `ResponsePlot.tsx` and
-    `ResidualPlot.tsx`, with the chrome they share in `PlotParts.tsx`. They
-    were stacked under a single axis and a single legend until a reviewer read
-    the pair as one graph: two meanings of "dB" under one key list, and the
-    only frequency labels on the page sitting beneath the *lower* figure, so
-    identifying a feature on the response meant tracking down past the
-    residual to find out what frequency it was at. What the two still share is
-    `xOf` — same viewBox width, same margins, same log mapping, so the cards
-    stack in register — and the crosshair, which `Plots.tsx` owns for that
-    reason. The hover index lives in `Plots` and not in `App` so that a
-    pointer crossing a figure re-renders two figures and not the metrics, the
-    filter table and the export panel below them. The note explaining that the
-    residual is measured on the published, rounded values moved out of
-    `MetricsPanel` at the same time: it was describing a figure two panels
-    away, with the stat grid in between.
-  - **The ISO target is warm; everything in the response family is cool.**
-    `--color-target` is amber (#fbbf24), not the blue-grey it was — the same
-    reviewer could not reliably separate a thick #94a3b8 target from a #818cf8
-    response, which is one hue family distinguished only by a doubling in
-    width. Hue now carries it and width reinforces it, which is what a small
-    screen and a red-green-blind reader need. Per-band traces are dashed for
-    the same reason: they are components of the response, so they stay in the
-    accent colour and separate on dash instead. The residual figure's ±max
-    lines went slate when amber moved, so amber means one thing per page.
-  - **The response figure adds the headroom; the residual figure must not.**
-    Both traces on the response are drawn with the preamp applied, against
-    a 0 dBFS clipping line and a dotted flat reference, exactly as
-    `plot_frequency_response` draws the figures in `images/`. This is not
-    cosmetic: without it a compensation curve sits almost entirely *above*
-    zero and reads as a proposal to boost and clip, when what it asks for is
-    attenuation everywhere except the extremes. The residual is the difference
-    of two curves, so the preamp cancels out of it — shifting that figure too
-    would be wrong, and the published `max_residual_db` is measured on the
-    cascade alone. Per-band traces are drawn from the flat reference, so a
-    band's distance from that line is its contribution and those distances
-    still sum to the response's; shifting each band by the whole preamp would
-    not. A refused level has no published headroom, so it is drawn against the
-    headroom it *would* need, which is the reason it was refused.
-  - **The type floor is 14px (`text-sm`); running prose is 16px
-    (`text-base`).** The audience is listeners, not developers — the owner puts
-    the median age nearer 60 than 30 — and the 10–11px captions this page
-    shipped with were legible only by leaning in. The plot's legend was missed
-    entirely for that reason, and read as unlabelled traces. `text-xs` and
-    `text-[10px]`/`text-[11px]` are therefore absent from `ui/src`; the rule is
-    written down at the top of `src/index.css`. The exception is text inside
-    the plot's `<svg>`, sized in viewBox units, which scales with the figure
-    and not with the type scale — it is still 10–11 units and does shrink on a
-    narrow window.
-  - **The preview's bypass removes the bands and moves the preamp to
-    `bypassHeadroomDb`.** Which, since the A/B is matched at 1 kHz, is the
-    same number as `headroomDb` at every rung but 83→60 — so in practice the
-    preamp now stays put and the bands are the whole change. **Do not
-    "simplify" this to reading `headroomDb`.** The page must publish whatever
-    the generator published, and this field is where a future revision of the
-    match would arrive; hard-coding the identity would silently ignore it, and
-    would already be wrong at 83→60. This went the other way once: a 500 Hz
-    match shipped on 2026-08-09 making the two differ by 0.3–1.2 dB down the
-    ladder, and was falsified the same day — see the bypass invariant below.
-    `update` reads the bypass flag off the graph rather than React state,
-    because a stale closure there would drag the slider's gain onto the wrong
-    side of the comparison. The plot's dotted flat line stays at the preamp:
-    it is the datum the per-band traces are measured from. The graph
-    allocates one biquad per published band up front rather than one per
-    filter, so the slider can move between any two levels — including onto the
-    pass-through rung, which has no filters — without a rebuild. An unused
-    slot must be set to **`peaking` at 0 dB**, not merely to 0 dB: a fresh
-    `BiquadFilterNode` is a lowpass at 350 Hz, and `gain` does nothing to a
-    lowpass.
-  - **Nothing above the figure may depend on the preview state.** The "Hearing
-    …" chip lives among the plot's legend keys, below the `<svg>`, and it
-    belongs there for layout rather than taste: in the plot's *header* it grew
-    that row from 20px to 30px when the preview started — a `text-sm` row
-    against a `px-3 py-1` pill — so the plot dropped 10px out from under the
-    pointer, and at narrow widths the row wrapped instead and the drop became a
-    whole line. Below the figure the row can appear, disappear and rewrap for
-    free. It reads as one more key anyway, since it names a trace drawn beside
-    it. The page header has the same shape of problem and still has it: it
-    gains the bypass button while playing, and being `sticky`, a wrap there
-    moves the whole page.
-  - **The page's closing block is a summary; the README is the document.** The
-    footer carries the four-step workflow and three short notes, in two
-    columns, and links the rest to `README.md#using-the-web-app`. It was four
-    dense paragraphs, which at readable type became a wall of text. New
-    explanation belongs in that README section, not appended here — a listener
-    opens this page to get a filter set out of it, not to read about it. The
-    masthead line reads the same way: it says what the filters *do*, in the
-    reader's terms, rather than reciting the edition and the band count, which
-    are already in the legend, the metrics and the footer.
+  Its working notes live in **`ui/CLAUDE.md`**, which loads when you work under
+  that directory. Two rules there reach back into this file: the page's data is
+  `web/curves.json`, sampled on the optimizer's own design grid, and `ui/` must
+  never hold a copy of it.
 
-- **`tests/test_api.py`** — the HTTP service, through Flask's test client: no
-  server, no port, no gunicorn, 0.3 s for the file. Flask is deliberately absent
-  from the repository's `requirements.txt` (only `web/requirements.txt` has it),
-  so the `api` fixture in `conftest.py` uses `importorskip` — a contributor
-  working on the maths must not have to install a web framework. The two
-  contracts worth the most are the uniform two-key response shape and that every
-  level the API suggests can actually be served.
-  - Live responses are also validated against the schemas in `openapi.yaml`.
-    OpenAPI 3.1 schemas **are** JSON Schema 2020-12, so they are used directly
-    rather than translated. The spec is registered with `referencing` under
-    `SPEC_URI` and each response schema is reached by JSON pointer into that
-    document — not lifted out as a value, because a bare `{"$ref": "#/..."}`
-    resolves against itself and finds nothing, and because refs *inside* a
-    lifted schema would lose the document they were written in.
-    `test_the_schemas_are_strict_enough_to_reject_a_broken_response` breaks a
-    real response two ways and requires the schema to notice; without it a
-    permissive schema would make the whole group pass vacuously.
-  - `jsonschema>=4.18` is in the root `requirements.txt` as a **test**
-    dependency (4.18 is where the `referencing` registry arrived). It must
-    never reach `web/requirements.txt`.
-
-- **`tests/test_iso226.py`** — the math. `test_matches_published_annex_b` and
-  the shelf-property tests are the ones that matter: they are the only checks
-  not sharing code with the thing under test. The shelf tests caught a sign
-  error in the RBJ high-shelf `b2` coefficient that had shipped since the first
-  version and that `check.py` could never have detected.
-
-- **`tests/test_generator.py`** — the generator plus the file formats that
-  couple the two scripts. The Markdown/YAML round-trip tests are the ones most
-  likely to earn their keep: `check.py` matches filter-type strings and table
-  columns *positionally*, and nothing else notices when one side of that
-  contract changes.
+- **`tests/`** — the suite's working notes live in **`tests/CLAUDE.md`**, which
+  loads when you work under that directory. The short version: the tests that
+  earn their keep are the ones not sharing code with the thing under test —
+  `test_matches_published_annex_b`, the shelf-property tests, and the
+  Markdown/YAML round-trips that couple the generator to `check.py`.
 
 ### ISO data — no ISO numbers live in this repository
 
@@ -398,21 +171,16 @@ value it does not own.
 ## Code quality bar
 
 **pylint must reach 10.00/10.** Not "close enough" — the owner's standing
-preference is a clean run. Treat every finding as a real defect until shown
-otherwise, because on this project they repeatedly have been: a lint pass found
-`check.py` calling `sys.path.insert` *after* the import it existed to enable,
-which worked only because Python happens to put a script's own directory on the
-path.
+preference is a clean run. The bar, the exact invocation and the reasoning
+behind both are in `CONTRIBUTING.md`; what follows is only what that section
+does not carry.
 
 The single exception is a fix that would genuinely harm clarity or
 maintainability. When that applies:
 
 * disable the check **at the site**, with a comment saying why — never in a
   config file, and never a bare `# pylint: disable=` with no reasoning;
-* prefer restructuring over suppressing. This worked: the `R0913` / `R0914`
-  findings that sat at 9.85 for a long time were pointing at a real design
-  problem, and were cleared by fixing it rather than silencing it. See
-  `Compensation` below.
+* prefer restructuring over suppressing. See `Compensation` below.
 
 Existing documented exceptions, all deliberate: `wrong-import-position` where
 `sys.path` setup or matplotlib's backend selection must precede imports;
@@ -422,14 +190,12 @@ second and is not needed by most invocations; `redefined-outer-name` in
 the name; `protected-access` in the Table 1 loader tests, which are testing the
 loader's contract.
 
-**The score is 10.00.** Run the full command above — linting `tests/` on its own
-reports spurious `import-error`, because the repo root only lands on the path
-when the modules are linted together.
+**The score is 10.00.** Run the full command from `CONTRIBUTING.md` — linting
+`tests/` on its own reports spurious `import-error`, because the repo root only
+lands on the path when the modules are linted together.
 
-**Any Bash added to this repo must pass `shellcheck -S style` cleanly.** There
-is essentially no excuse for a finding at that level; fix the script rather than
-silencing the check. (There are no shell scripts here at present — orchestration
-lives in `regenerate.py` — so this applies to anything new.)
+**Any Bash added to this repo must pass `shellcheck -S style` cleanly**, which
+today means `deploy/install.sh`.
 
 ## Invariants — do not break these
 
